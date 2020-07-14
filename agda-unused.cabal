@@ -1,0 +1,64 @@
+name:
+  agda-unused
+version:
+  0.1.0.0
+license:
+  MIT
+license-file:
+  LICENSE
+build-type:
+  Simple
+cabal-version:
+  >=1.10
+data-files:
+  data/**/*.agda
+
+library
+  hs-source-dirs:
+    lib
+  exposed-modules:
+    Agda.Unused
+    Agda.Unused.Access
+    Agda.Unused.Context
+    Agda.Unused.Environment
+    Agda.Unused.Error
+    Agda.Unused.Item
+    Agda.Unused.Name
+    Agda.Unused.Print
+    Agda.Unused.Range
+    Agda.Unused.Root
+    Agda.Unused.State
+  other-modules:
+    Agda.Unused.Utils
+  build-depends:
+    base,
+    Agda,
+    containers,
+    directory,
+    filepath,
+    mtl,
+    text
+  default-language:
+    Haskell2010
+  default-extensions:
+    FlexibleContexts,
+    FlexibleInstances,
+    GADTs,
+    OverloadedStrings
+  ghc-options:
+    -Wall -Wno-orphans
+
+executable agda-unused
+  hs-source-dirs:
+    src
+  main-is:
+    Main.hs
+  build-depends:
+    base,
+    agda-unused,
+    text
+  default-language:
+    Haskell2010
+  ghc-options:
+    -Wall
+

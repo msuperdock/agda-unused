@@ -1,4 +1,10 @@
-module Agda.Unused.Utils where
+module Agda.Unused.Utils
+  ( liftMaybe
+  , mapAdjustM
+  , mapDeletes
+  , mapLeft
+  , mapUpdateKey
+  ) where
 
 import Control.Monad.Except
   (MonadError, throwError)
@@ -48,4 +54,14 @@ mapUpdateKey
   -> Map k a
 mapUpdateKey k k' m
   = maybe m (\x -> Map.insert k' x (Map.delete k m)) (Map.lookup k m)
+
+mapAdjustM
+  :: Ord k
+  => Monad m
+  => (a -> m a)
+  -> k
+  -> Map k a
+  -> m (Map k a)
+mapAdjustM f k m
+  = maybe (pure m) (\x -> Map.insert k <$> f x <*> pure m) (Map.lookup k m)
 

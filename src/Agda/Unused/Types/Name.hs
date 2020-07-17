@@ -1,7 +1,8 @@
-module Agda.Unused.Name
+module Agda.Unused.Types.Name
   ( Name (..)
   , NamePart (..)
   , QName (..)
+  , append
   , fromAsName
   , fromName
   , fromNameRange
@@ -75,6 +76,15 @@ isBuiltin (Qual (Name [Id "Agda"]) _)
   = True
 isBuiltin _
   = False
+
+append
+  :: QName
+  -> QName
+  -> QName
+append (QName m) n
+  = Qual m n
+append (Qual m ms) n
+  = Qual m (append ms n)
 
 stripPrefix
   :: QName

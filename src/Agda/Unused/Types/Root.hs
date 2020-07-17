@@ -1,8 +1,8 @@
-module Agda.Unused.Root
+module Agda.Unused.Types.Root
   ( Root (..)
   ) where
 
-import Agda.Unused.Name
+import Agda.Unused.Types.Name
   (QName)
 
 data Root

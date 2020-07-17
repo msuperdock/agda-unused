@@ -2,12 +2,12 @@ module Agda.Unused.Print
   ( printUnused
   ) where
 
-import Agda.Unused.Error
+import Agda.Unused.Monad.Error
   (Error (..), InternalError (..), UnexpectedError (..), UnsupportedError (..))
-import Agda.Unused.Name
+import Agda.Unused.Types.Name
   (Name (..), NamePart (..), QName (..))
-import Agda.Unused.Range
-  (Range, RangeInfo (..), RangeType (..), getRange)
+import Agda.Unused.Types.Range
+  (Range, Range' (..), RangeInfo (..), RangeType (..), getRange)
 
 import Agda.Utils.Pretty
   (prettyShow)
@@ -67,8 +67,10 @@ printQName (Qual n ns)
 printRange
   :: Range
   -> Text
-printRange
-  = T.pack . show
+printRange NoRange
+  = "unknown location"
+printRange r@(Range _ _)
+  = T.pack (show r)
 
 -- ## Messages
 
@@ -102,7 +104,7 @@ printError (ErrorInternal e r)
   $ "internal error: " <> printInternalError e
 printError (ErrorOpen r n)
   = printMessage (printRange r)
-  $ "error: module " <> parens (printQName n) <> " not found"
+  $ "error: module not found " <> parens (printQName n)
 printError (ErrorPolarity (Just r))
   = printMessage (printRange r)
   $ "error: multiple polarity declarations"

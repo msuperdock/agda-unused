@@ -15,19 +15,20 @@ data-files:
 
 library
   hs-source-dirs:
-    lib
+    src
   exposed-modules:
     Agda.Unused
-    Agda.Unused.Access
-    Agda.Unused.Context
-    Agda.Unused.Environment
-    Agda.Unused.Error
-    Agda.Unused.Item
-    Agda.Unused.Name
+    Agda.Unused.Monad.Context
+    Agda.Unused.Monad.Context.Item
+    Agda.Unused.Monad.Error
+    Agda.Unused.Monad.Reader
+    Agda.Unused.Monad.State
+    Agda.Unused.Monad.Writer
     Agda.Unused.Print
-    Agda.Unused.Range
-    Agda.Unused.Root
-    Agda.Unused.State
+    Agda.Unused.Types.Access
+    Agda.Unused.Types.Name
+    Agda.Unused.Types.Range
+    Agda.Unused.Types.Root
   other-modules:
     Agda.Unused.Utils
   build-depends:
@@ -51,7 +52,7 @@ library
 
 executable agda-unused
   hs-source-dirs:
-    src
+    app
   main-is:
     Main.hs
   build-depends:

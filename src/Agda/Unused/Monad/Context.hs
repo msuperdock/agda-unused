@@ -1,4 +1,4 @@
-module Agda.Unused.Context
+module Agda.Unused.Monad.Context
   ( AccessContext
   , Context
   , (\\)
@@ -14,7 +14,9 @@ module Agda.Unused.Context
   , accessContextOperators
   , accessContextOperatorsP
   , accessContextPrivate
+  , accessContextSearch
   , accessContextSingleton
+  , accessContextSingletonConstructor
   , accessContextUnion
   , contextCons
   , contextDelete
@@ -32,21 +34,28 @@ module Agda.Unused.Context
   , fromContext
   ) where
 
-import Agda.Unused.Access
-  (Access (..), access)
-import Agda.Unused.Error
+import Agda.Unused.Monad.Context.Item
+  (AccessItem, Item, accessItem, accessItemConstructor, accessItemDefining,
+    accessItemExport, accessItemHasRange, accessItemIsConstructor,
+    accessItemPrivate, accessItemRangesMay, accessItemUnion, fromItem,
+    itemHasRange, itemInsert, itemRanges, toItem)
+import Agda.Unused.Monad.Error
   (LookupError (..))
-import Agda.Unused.Item
-  (AccessItem, Item, accessItemDefining, accessItemExport,
-    accessItemIsConstructor, accessItemPrivate, accessItemRanges,
-    accessItemUnion, fromItem, itemInsert, itemRanges, toItem)
-import Agda.Unused.Name
-  (Name, QName (..), isOperator, stripPrefix)
-import Agda.Unused.Range
+import Agda.Unused.Monad.Reader
+  (Environment)
+import Agda.Unused.Types.Access
+  (Access (..), access)
+import Agda.Unused.Types.Name
+  (Name, QName (..), append, isOperator, stripPrefix)
+import Agda.Unused.Types.Range
   (Range)
 import Agda.Unused.Utils
-  (mapUpdateKey)
+  (mapAdjustM, mapUpdateKey)
 
+import Control.Monad.Reader
+  (MonadReader)
+import Data.Bool
+  (bool)
 import Data.Map.Strict
   (Map)
 import qualified Data.Map.Strict
@@ -130,11 +139,32 @@ contextCons n c
   = Context mempty (Map.singleton n c)
 
 accessContextSingleton
-  :: Name
-  -> AccessItem
-  -> AccessContext
-accessContextSingleton n i
-  = AccessContext (Map.singleton n i) mempty mempty
+  :: MonadReader Environment m
+  => Name
+  -> Access
+  -> [Range]
+  -> m AccessContext
+accessContextSingleton
+  = accessContextSingletonWith accessItem
+
+accessContextSingletonConstructor
+  :: MonadReader Environment m
+  => Name
+  -> Access
+  -> [Range]
+  -> m AccessContext
+accessContextSingletonConstructor
+  = accessContextSingletonWith accessItemConstructor
+
+accessContextSingletonWith
+  :: MonadReader Environment m
+  => (Access -> [Range] -> m AccessItem)
+  -> Name
+  -> Access
+  -> [Range]
+  -> m AccessContext
+accessContextSingletonWith f n a rs
+  = f a rs >>= \i -> pure (AccessContext (Map.singleton n i) mempty mempty)
 
 accessContextCons
   :: Name
@@ -161,27 +191,30 @@ accessContextImport n c
 
 -- Do nothing if name not found.
 contextInsert
-  :: Name
+  :: MonadReader Environment m
+  => Name
   -> Range
   -> Context
-  -> Context
+  -> m Context
 contextInsert n r (Context is ms)
-  = Context (Map.adjust (itemInsert r) n is) ms
+  = Context <$> mapAdjustM (itemInsert r) n is <*> pure ms
 
 contextInsertModule
-  :: Name
+  :: MonadReader Environment m
+  => Name
   -> Range
   -> Context
-  -> Context
+  -> m Context
 contextInsertModule n r (Context is ms)
-  = Context is (Map.adjust (contextInsertAll r) n ms)
+  = Context is <$> mapAdjustM (contextInsertAll r) n ms
 
 contextInsertAll
-  :: Range
+  :: MonadReader Environment m
+  => Range
   -> Context
-  -> Context
+  -> m Context
 contextInsertAll r (Context is ms)
-  = Context (itemInsert r <$> is) (contextInsertAll r <$> ms)
+  = Context <$> traverse (itemInsert r) is <*> traverse (contextInsertAll r) ms
 
 contextRename
   :: Name
@@ -317,7 +350,29 @@ accessContextLookupName
   -> AccessContext
   -> [Range]
 accessContextLookupName n (AccessContext is _ _)
-  = maybe [] id (Map.lookup n is >>= accessItemRanges)
+  = maybe [] id (Map.lookup n is >>= accessItemRangesMay)
+
+contextSearch
+  :: Range
+  -> Context
+  -> [QName]
+contextSearch r (Context is ms)
+  = Map.foldMapWithKey
+    (\n i -> QName <$> bool [] [n] (itemHasRange r i)) is
+  <> Map.foldMapWithKey
+    (\n c -> Qual n <$> contextSearch r c) ms
+
+accessContextSearch
+  :: Range
+  -> AccessContext
+  -> [QName]
+accessContextSearch r (AccessContext is ms js)
+  = Map.foldMapWithKey
+    (\n i -> QName <$> bool [] [n] (accessItemHasRange r i)) is
+  <> Map.foldMapWithKey
+    (\n (_, c) -> Qual n <$> contextSearch r c) ms
+  <> Map.foldMapWithKey
+    (\n c -> append n <$> contextSearch r c) js
 
 contextRanges
   :: Context

@@ -1,4 +1,4 @@
-module Agda.Unused.Access
+module Agda.Unused.Types.Access
   ( Access (..)
   , access
   , fromAccess

@@ -1,15 +1,16 @@
-module Agda.Unused.Range
+module Agda.Unused.Types.Range
   ( Range
+  , Range' (..)
   , RangeType (..)
   , RangeInfo (..)
   , getRange
   ) where
 
-import Agda.Unused.Name
+import Agda.Unused.Types.Name
   (QName)
 
 import Agda.Syntax.Position
-  (Range, getRange)
+  (Range, Range' (..), getRange)
 
 data RangeType where
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 
-module Agda.Unused.Error
+module Agda.Unused.Monad.Error
   ( Error (..)
   , InternalError (..)
   , LookupError (..)
@@ -9,9 +9,9 @@ module Agda.Unused.Error
   , liftLookup
   ) where
 
-import Agda.Unused.Name
+import Agda.Unused.Types.Name
   (QName)
-import Agda.Unused.Range
+import Agda.Unused.Types.Range
   (Range, getRange)
 
 import Agda.Syntax.Concrete.Definitions

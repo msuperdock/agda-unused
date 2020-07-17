@@ -1,22 +1,33 @@
-module Agda.Unused.Item
-  ( AccessItem (..)
+module Agda.Unused.Monad.Context.Item
+  ( AccessItem
   , Item (..)
+  , accessItem
+  , accessItemConstructor
   , accessItemDefining
   , accessItemExport
+  , accessItemHasRange
   , accessItemIsConstructor
   , accessItemPrivate
-  , accessItemRanges
+  , accessItemRangesMay
   , accessItemUnion
   , fromItem
+  , itemHasRange
   , itemInsert
   , itemRanges
   , toItem
   ) where
 
-import Agda.Unused.Access
+import Agda.Unused.Monad.Reader
+  (Environment, askBuiltin)
+import Agda.Unused.Types.Access
   (Access (..))
-import Agda.Unused.Range
+import Agda.Unused.Types.Range
   (Range)
+
+import Control.Monad.Reader
+  (MonadReader)
+import Data.Bool
+  (bool)
 
 data Item where
 
@@ -67,14 +78,35 @@ accessItemUnion i@(AccessItem Public _ _) (AccessItem Private _ _)
 accessItemUnion i1 i2
   = i1 <> i2
 
+-- Use empty range if in a builtin module.
+accessItem
+  :: MonadReader Environment m
+  => Access
+  -> [Range]
+  -> m AccessItem
+accessItem a rs
+  = askBuiltin >>= \b -> pure (AccessItem a False (bool rs [] b))
+
+-- Use empty ranges if in a builtin module.
+accessItemConstructor
+  :: MonadReader Environment m
+  => Access
+  -> [Range]
+  -> m AccessItem
+accessItemConstructor Private rs
+  = askBuiltin >>= \b -> pure (AccessItemConstructor (bool rs [] b) [])
+accessItemConstructor Public rs
+  = askBuiltin >>= \b -> pure (AccessItemConstructor [] (bool rs [] b))
+
 itemInsert
-  :: Range
+  :: MonadReader Environment m
+  => Range
   -> Item
-  -> Item
+  -> m Item
 itemInsert r (ItemConstructor rs)
-  = ItemConstructor (r : rs)
+  = askBuiltin >>= pure . ItemConstructor . bool (r : rs) []
 itemInsert r (Item rs)
-  = Item (r : rs)
+  = askBuiltin >>= pure . Item . bool (r : rs) []
 
 accessItemDefining
   :: AccessItem
@@ -100,16 +132,36 @@ itemRanges (ItemConstructor rs)
 itemRanges (Item rs)
   = rs
 
--- Return Nothing if defining.
 accessItemRanges
   :: AccessItem
-  -> Maybe [Range]
+  -> [Range]
 accessItemRanges (AccessItemConstructor rs ss)
-  = Just (rs <> ss)
-accessItemRanges (AccessItem _ False rs)
-  = Just rs
-accessItemRanges (AccessItem _ True _)
+  = rs <> ss
+accessItemRanges (AccessItem _ _ rs)
+  = rs
+
+-- Return Nothing if defining.
+accessItemRangesMay
+  :: AccessItem
+  -> Maybe [Range]
+accessItemRangesMay (AccessItem _ True _)
   = Nothing
+accessItemRangesMay i
+  = Just (accessItemRanges i)
+
+itemHasRange
+  :: Range
+  -> Item
+  -> Bool
+itemHasRange r
+  = elem r . itemRanges
+
+accessItemHasRange
+  :: Range
+  -> AccessItem
+  -> Bool
+accessItemHasRange r
+  = elem r . accessItemRanges
 
 fromItem
   :: Access

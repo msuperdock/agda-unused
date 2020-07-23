@@ -1,5 +1,5 @@
 { mkDerivation, Agda, base, containers, directory, filepath, hspec
-, mtl, stdenv, text
+, megaparsec, mtl, stdenv, text
 }:
 mkDerivation {
   pname = "agda-unused";
@@ -9,9 +9,9 @@ mkDerivation {
   isExecutable = true;
   enableSeparateDataOutput = true;
   libraryHaskellDepends = [
-    Agda base containers directory filepath mtl text
+    Agda base containers directory filepath megaparsec mtl text
   ];
   executableHaskellDepends = [ base text ];
-  testHaskellDepends = [ base hspec ];
+  testHaskellDepends = [ base containers hspec ];
   license = stdenv.lib.licenses.mit;
 }

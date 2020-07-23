@@ -1,7 +1,13 @@
 module Agda.Unused.Print
-  ( printUnused
+  ( indent
+  , parens
+  , printError
+  , printUnused
+  , quote
   ) where
 
+import Agda.Unused
+  (Unused)
 import Agda.Unused.Monad.Error
   (Error (..), InternalError (..), UnexpectedError (..), UnsupportedError (..))
 import Agda.Unused.Types.Name
@@ -11,8 +17,6 @@ import Agda.Unused.Types.Range
 
 import Agda.Utils.Pretty
   (prettyShow)
-import Data.Map.Strict
-  (Map)
 import qualified Data.Map.Strict
   as Map
 import Data.Text
@@ -166,7 +170,28 @@ printUnsupportedError UnsupportedMacro
 printUnsupportedError UnsupportedUnquote
   = "unquoting primitives"
 
--- ## Warnings
+-- ## Unused
+
+printUnused
+  :: Unused
+  -> Text
+printUnused rs | Map.null rs
+  = T.unlines ["no unused code"]
+printUnused rs
+  = Map.foldMapWithKey printRangeInfo rs
+
+printRangeInfo
+  :: Range
+  -> RangeInfo
+  -> Text
+printRangeInfo r i
+  = printMessage (printRange r) (printRangeInfo' i)
+
+printRangeInfo'
+  :: RangeInfo
+  -> Text
+printRangeInfo' (RangeInfo t n)
+  = T.unwords ["unused", printRangeType t, quote (printQName n)]
 
 printRangeType
   :: RangeType
@@ -191,35 +216,4 @@ printRangeType RangeRecordConstructor
   = "record constructor"
 printRangeType RangeVariable
   = "variable"
-
-printRangeInfo
-  :: RangeInfo
-  -> Text
-printRangeInfo (RangeInfo t n)
-  = T.unwords ["unused", printRangeType t, quote (printQName n)]
-
-printWarning
-  :: Range
-  -> RangeInfo
-  -> Text
-printWarning r i
-  = printMessage (printRange r) (printRangeInfo i)
-
-printWarnings
-  :: Map Range RangeInfo
-  -> Text
-printWarnings rs | Map.null rs
-  = T.unlines ["no unused code"]
-printWarnings rs
-  = Map.foldMapWithKey printWarning rs
-
--- ## Main
-
-printUnused
-  :: Either Error (Map Range RangeInfo)
-  -> Text
-printUnused (Left e)
-  = printError e
-printUnused (Right rs)
-  = printWarnings rs
 

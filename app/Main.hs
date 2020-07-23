@@ -2,74 +2,73 @@ module Main where
 
 import Agda.Unused
   (checkUnused)
-import Agda.Unused.Print
-  (printUnused)
-import Agda.Unused.Types.Name
-  (Name (..), NamePart (..), QName (..))
-import Agda.Unused.Types.Root
-  (Root (..))
+import Agda.Unused.Config
+  (parseConfig)
+import qualified Agda.Unused.Print
+  as P
+import Agda.Unused.Utils
+  (mapLeft)
+
+import Control.Monad.Except
+  (MonadError, liftEither, runExceptT, throwError)
+import Control.Monad.IO.Class
+  (MonadIO, liftIO)
+import Data.Bool
+  (bool)
+import Data.Text
+  (Text)
+import qualified Data.Text
+  as T
 import qualified Data.Text.IO
   as I
+import System.Directory
+  (doesFileExist, getCurrentDirectory)
+import System.FilePath
+  ((</>))
 
-path
-  :: FilePath
-path
-  = "/data/code/prover/src"
+data Error where
+ 
+  ErrorFile
+    :: !FilePath
+    -> Error
 
--- roots
---   :: [Root]
--- roots
---   = [ Root
---       { rootFile
---         = Qual (Name [Id "Prover"])
---         $ Qual (Name [Id "Prelude"])
---         $ QName (Name [Id "Any"])
---       , rootNames
---         = []
---       }
---     ]
+  ErrorParse
+    :: !Text
+    -> Error
 
-roots
-  :: [Root]
-roots
-  = [ Root
-      { rootFile
-        = QName (Name [Id "Main"])
-      , rootNames
-        = [QName (Name [Id "main"])]
-      }
-    , Root
-      { rootFile
-        = Qual (Name [Id "Prover"])
-        $ Qual (Name [Id "Editor"])
-        $ Qual (Name [Id "Indexed"])
-        $ QName (Name [Id "Map"])
-      , rootNames
-        = []
-      }
-    , Root
-      { rootFile
-        = Qual (Name [Id "Prover"])
-        $ Qual (Name [Id "Editor"])
-        $ Qual (Name [Id "Indexed"])
-        $ QName (Name [Id "Product"])
-      , rootNames
-        = []
-      }
-    , Root
-      { rootFile
-        = Qual (Name [Id "Prover"])
-        $ Qual (Name [Id "Editor"])
-        $ Qual (Name [Id "Indexed"])
-        $ QName (Name [Id "Sigma"])
-      , rootNames
-        = []
-      }
-    ]
+printError
+  :: Error
+  -> Text
+printError (ErrorFile p)
+  = "error: .roots file not found " <> P.parens (T.pack p)
+printError (ErrorParse t)
+  = t
+
+main'
+  :: MonadError Error m
+  => MonadIO m
+  => FilePath
+  -> m ()
+main' p = do
+  configPath
+    <- pure (p </> ".roots")
+  exists
+    <- liftIO (doesFileExist configPath)
+  _
+    <- bool (throwError (ErrorFile configPath)) (pure ()) exists
+  contents
+    <- liftIO (I.readFile configPath)
+  roots
+    <- liftEither (mapLeft ErrorParse (parseConfig contents))
+  checkResult
+    <- liftIO (checkUnused p roots)
+  _
+    <- liftIO (I.putStr (either P.printError P.printUnused checkResult))
+  pure ()
 
 main
   :: IO ()
 main
-  = checkUnused path roots
-  >>= I.putStrLn . printUnused
+  = runExceptT (main' "/data/code/prover/src")
+  >>= either (I.putStr . printError) (const (pure ()))
 

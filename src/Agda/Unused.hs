@@ -1,5 +1,6 @@
 module Agda.Unused
-  ( checkUnused
+  ( Unused
+  , checkUnused
   , checkUnusedLog
   ) where
 
@@ -1459,14 +1460,14 @@ checkImportedNamePair
 checkImportedNamePair dt c (_, ImportedName n, ImportedName t)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange t)) (fromNameRange t)
-  >>= \(r, t') -> modifyInsert r (RangeInfo (directiveItem dt) (QName n'))
+  >>= \(r, t') -> modifyInsert r (RangeInfo (directiveItem dt) (QName t'))
   >> contextInsertAll r
     (maybe mempty (contextSingleton t') (contextLookupItem (QName n') c)
       <> maybe mempty (contextCons t') (contextLookupModule (QName n') c))
 checkImportedNamePair dt c (_, ImportedModule n, ImportedModule t)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange t)) (fromNameRange t)
-  >>= \(r, t') -> modifyInsert r (RangeInfo (directiveItem dt) (QName n'))
+  >>= \(r, t') -> modifyInsert r (RangeInfo (directiveItem dt) (QName t'))
   >> contextInsertAll r
     (maybe mempty (contextCons t') (contextLookupModule (QName n') c))
 checkImportedNamePair _ _ (r, _, _)
@@ -1641,10 +1642,10 @@ checkFilePath r n p = do
     <- modify (stateBlock n)
   absolutePath
     <- pure (AbsolutePath (T.pack p))
-  exist
+  exists
     <- liftIO (doesFileExist p)
   _
-    <- bool (throwError (ErrorFile r n p)) (pure ()) exist
+    <- bool (throwError (ErrorFile r n p)) (pure ()) exists
   contents
     <- liftIO (readFile p)
   (parseResult, _)

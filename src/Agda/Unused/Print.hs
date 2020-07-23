@@ -6,8 +6,6 @@ module Agda.Unused.Print
   , quote
   ) where
 
-import Agda.Unused
-  (Unused)
 import Agda.Unused.Monad.Error
   (Error (..), InternalError (..), UnexpectedError (..), UnsupportedError (..))
 import Agda.Unused.Types.Name
@@ -17,6 +15,8 @@ import Agda.Unused.Types.Range
 
 import Agda.Utils.Pretty
   (prettyShow)
+import Data.Map.Strict
+  (Map)
 import qualified Data.Map.Strict
   as Map
 import Data.Text
@@ -173,24 +173,24 @@ printUnsupportedError UnsupportedUnquote
 -- ## Unused
 
 printUnused
-  :: Unused
+  :: Map Range RangeInfo
   -> Text
 printUnused rs | Map.null rs
   = T.unlines ["no unused code"]
 printUnused rs
-  = Map.foldMapWithKey printRangeInfo rs
+  = Map.foldMapWithKey printRangeInfoWith rs
 
-printRangeInfo
+printRangeInfoWith
   :: Range
   -> RangeInfo
   -> Text
-printRangeInfo r i
-  = printMessage (printRange r) (printRangeInfo' i)
+printRangeInfoWith r i
+  = printMessage (printRange r) (printRangeInfo i)
 
-printRangeInfo'
+printRangeInfo
   :: RangeInfo
   -> Text
-printRangeInfo' (RangeInfo t n)
+printRangeInfo (RangeInfo t n)
   = T.unwords ["unused", printRangeType t, quote (printQName n)]
 
 printRangeType

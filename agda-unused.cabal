@@ -24,7 +24,6 @@ library
     Agda.Unused.Monad.Error
     Agda.Unused.Monad.Reader
     Agda.Unused.Monad.State
-    Agda.Unused.Monad.Writer
     Agda.Unused.Print
     Agda.Unused.Types.Access
     Agda.Unused.Types.Name

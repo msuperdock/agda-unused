@@ -1,7 +1,5 @@
 module Agda.Unused
-  ( Unused
-  , checkUnused
-  , checkUnusedLog
+  ( checkUnused
   ) where
 
 import Agda.Unused.Monad.Context
@@ -19,12 +17,10 @@ import Agda.Unused.Monad.Error
   (Error (..), InternalError (..), LookupError (..), UnexpectedError (..),
     UnsupportedError (..), liftLookup)
 import Agda.Unused.Monad.Reader
-  (Environment (..), askBuiltin, askRange, askRoot, localBuiltin)
+  (Environment (..), askBuiltin, askRoot, localBuiltin)
 import Agda.Unused.Monad.State
-  (ModuleState (..), State (..), modifyDelete, modifyDeleteRoots, modifyInsert,
-    stateBlock, stateCheck, stateEmpty, stateLookup)
-import Agda.Unused.Monad.Writer
-  (Log (..), tellDeclaration, tellLog)
+  (ModuleState (..), State (..), modifyDelete, modifyInsert, stateBlock,
+    stateCheck, stateEmpty, stateLookup)
 import Agda.Unused.Types.Access
   (Access (..), access, fromAccess)
 import Agda.Unused.Types.Name
@@ -73,8 +69,6 @@ import Control.Monad.Reader
   (MonadReader, runReaderT)
 import Control.Monad.State
   (MonadState, gets, modify, runStateT)
-import Control.Monad.Writer
-  (MonadWriter, runWriterT)
 import Data.Bool
   (bool)
 import Data.Map.Strict
@@ -160,7 +154,6 @@ checkFoldWith x f g x' ys
 checkName
   :: MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => Bool
   -- ^ Whether to add new names to state.
   -> Access
@@ -173,15 +166,12 @@ checkName _ _ _ NoRange _
 checkName _ _ _ _ (Name [Hole])
   = pure mempty
 checkName b a t r@(Range _ _) n
-  = askRange
-  >>= \r' -> bool (pure ()) (modifyInsert r (RangeInfo t (QName n))) b
-  >> bool (pure ()) (tellLog (CheckName r n)) (r' == Just r)
+  = bool (pure ()) (modifyInsert r (RangeInfo t (QName n))) b
   >> accessContextSingleton n a [r]
 
 checkName'
   :: MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => Bool
   -- ^ Whether to add new names to state.
   -> Access
@@ -194,7 +184,6 @@ checkName' b a t n
 checkNames'
   :: MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => Access
   -> RangeType
   -> [N.Name]
@@ -206,7 +195,6 @@ checkQNameP
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => Maybe Name
   -- ^ A name to avoid checking.
   -> AccessContext
@@ -222,7 +210,6 @@ checkQNamePWith
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => Either LookupError [Range]
   -> AccessContext
   -> Range
@@ -237,7 +224,6 @@ checkQNameP'
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => Maybe Name
   -- ^ A name to avoid checking.
   -> AccessContext
@@ -249,7 +235,6 @@ checkQNameP' m c n
 checkQName
   :: MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => Access
   -> RangeType
   -> Range
@@ -263,30 +248,25 @@ checkQName _ _ _ (Qual _ _)
 touchName
   :: MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
-  => Range
-  -> AccessContext
+  => AccessContext
   -> Name
   -> m ()
-touchName r c n
-  = modifyDelete r (accessContextLookupName n c)
+touchName c n
+  = modifyDelete (accessContextLookupName n c)
 
 touchNames
   :: MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
-  => Range
-  -> AccessContext
+  => AccessContext
   -> [Name]
   -> m ()
-touchNames r
-  = checkSequence_ (touchName r)
+touchNames
+  = checkSequence_ touchName
 
 touchQName
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => AccessContext
   -> Range
   -> QName
@@ -298,7 +278,6 @@ touchQNameWith
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => Bool
   -- ^ Whether we are in a builtin module.
   -> Either LookupError [Range]
@@ -309,25 +288,23 @@ touchQNameWith False (Left LookupNotFound) _ _
   = pure ()
 touchQNameWith False (Left LookupAmbiguous) r n
   = throwError (ErrorAmbiguous r n)
-touchQNameWith False (Right rs) r _
-  = modifyDelete r rs
+touchQNameWith False (Right rs) _ _
+  = modifyDelete rs
 touchQNameWith True _ _ _
   = pure ()
 
 touchQNameContext
   :: MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => Context
   -> QName
   -> m ()
 touchQNameContext c n
-  = maybe (pure ()) modifyDeleteRoots (contextLookup n c)
+  = maybe (pure ()) modifyDelete (contextLookup n c)
 
 touchQNamesContext
   :: MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => Context
   -> [QName]
   -> m ()
@@ -338,7 +315,6 @@ touchQName'
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => AccessContext
   -> N.QName
   -> m ()
@@ -351,7 +327,6 @@ checkBinder
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => Bool
   -- ^ Whether to add new names to state.
@@ -367,7 +342,6 @@ checkBinders
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => Bool
   -- ^ Whether to add new names to state.
@@ -381,7 +355,6 @@ checkLamBinding
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => Bool
   -- ^ Whether to add new names to state.
@@ -397,7 +370,6 @@ checkLamBindings
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => Bool
   -- ^ Whether to add new names to state.
@@ -411,7 +383,6 @@ checkTypedBinding
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => Bool
   -- ^ Whether to add new names to state.
@@ -427,7 +398,6 @@ checkTypedBindings
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> [TypedBinding]
@@ -441,7 +411,6 @@ checkPattern
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => Maybe Name
   -- ^ A name to avoid checking.
@@ -455,8 +424,8 @@ checkPattern _ _ (QuoteP _)
 checkPattern m c (AppP p (Arg _ (Named _ p')))
   = (<>) <$> checkPattern m c p
     <*> checkPattern m c p'
-checkPattern m c (RawAppP r ps)
-  = checkRawAppP m c r ps
+checkPattern m c (RawAppP _ ps)
+  = checkRawAppP m c ps
 checkPattern _ _ (OpAppP r _ _ _)
   = throwError (ErrorInternal (ErrorUnexpected UnexpectedOpAppP) r)
 checkPattern m c (HiddenP _ (Named _ p))
@@ -489,7 +458,6 @@ checkPatternMay
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> Maybe Pattern
@@ -503,7 +471,6 @@ checkPatterns
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => Maybe Name
   -> AccessContext
@@ -516,17 +483,15 @@ checkRawAppP
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => Maybe Name
   -- ^ A name to avoid checking.
   -> AccessContext
-  -> Range
   -> [Pattern]
   -> m AccessContext
-checkRawAppP m c r ps
+checkRawAppP m c ps
   = pure (matchNames (patternNames ps) (accessContextOperatorsP c))
-  >>= \ns -> touchNames r (accessContextDefiningMay m c) ns
+  >>= \ns -> touchNames (accessContextDefiningMay m c) ns
   >> checkPatterns m c (patternDelete ns ps)
 
 patternMatch
@@ -564,7 +529,6 @@ checkExpr
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> Expr
@@ -577,8 +541,8 @@ checkExpr _ (QuestionMark _ _)
   = pure ()
 checkExpr _ (Underscore _ _)
   = pure ()
-checkExpr c (RawApp r es)
-  = checkRawApp c r es
+checkExpr c (RawApp _ es)
+  = checkRawApp c es
 checkExpr c (App _ e (Arg _ (Named _ e')))
   = checkExpr c e >> checkExpr c e'
 checkExpr _ (OpApp r _ _ _)
@@ -650,7 +614,6 @@ checkExprs
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> [Expr]
@@ -662,7 +625,6 @@ checkExprPair
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> (Expr, Expr)
@@ -674,7 +636,6 @@ checkExprPairs
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> [(Expr, Expr)]
@@ -686,14 +647,12 @@ checkRawApp
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
-  -> Range
   -> [Expr]
   -> m ()
-checkRawApp c r es
-  = touchNames r c (matchNames (exprNames es) (accessContextOperators c))
+checkRawApp c es
+  = touchNames c (matchNames (exprNames es) (accessContextOperators c))
   >> checkExprs c es
 
 exprName
@@ -717,7 +676,6 @@ checkRecordAssignment
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> RecordAssignment
@@ -731,7 +689,6 @@ checkRecordAssignments
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> [RecordAssignment]
@@ -743,7 +700,6 @@ checkFieldAssignment
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> FieldAssignment
@@ -755,7 +711,6 @@ checkFieldAssignments
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> [FieldAssignment]
@@ -767,7 +722,6 @@ checkModuleAssignment
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> ModuleAssignment
@@ -782,7 +736,6 @@ checkLHS
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => Maybe Name
   -- ^ A name to avoid checking.
@@ -799,7 +752,6 @@ checkRHS
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> RHS
@@ -813,7 +765,6 @@ checkClause
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> Clause
@@ -829,7 +780,6 @@ checkClauses
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> [Clause]
@@ -841,7 +791,6 @@ checkLamClause
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> LamClause
@@ -855,7 +804,6 @@ checkLamClauses
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> [LamClause]
@@ -867,7 +815,6 @@ checkLamClause_
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> LamClause
@@ -880,7 +827,6 @@ checkLamClauses_
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> [LamClause]
@@ -892,7 +838,6 @@ checkWhereClause
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> WhereClause
@@ -912,7 +857,6 @@ checkRewriteEqn
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> RewriteEqn
@@ -926,7 +870,6 @@ checkRewriteEqns
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> [RewriteEqn]
@@ -938,7 +881,6 @@ checkIrrefutableWith
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> (Pattern, Expr)
@@ -950,7 +892,6 @@ checkIrrefutableWiths
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> [(Pattern, Expr)]
@@ -962,7 +903,6 @@ checkDoStmt
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> DoStmt
@@ -981,7 +921,6 @@ checkDoStmts
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> [DoStmt]
@@ -995,7 +934,6 @@ checkDeclarations
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> [Declaration]
@@ -1007,7 +945,6 @@ checkDeclarationsRecord
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => Name
   -> [Range]
@@ -1022,7 +959,6 @@ checkDeclarationsTop
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> [Declaration]
@@ -1051,58 +987,43 @@ checkNiceDeclaration
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
-  => MonadIO m
-  => AccessContext
-  -> NiceDeclaration
-  -> m AccessContext
-checkNiceDeclaration c d
-  = checkNiceDeclaration' c d
-  >>= \c' -> tellDeclaration (getRange d) c'
-  >> pure c'
-
-checkNiceDeclaration'
-  :: MonadError Error m
-  => MonadReader Environment m
-  => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> NiceDeclaration
   -> m AccessContext
 
-checkNiceDeclaration' c (Axiom _ a _ _ _ n e)
+checkNiceDeclaration c (Axiom _ a _ _ _ n e)
   = checkExpr c e >> checkName' True (fromAccess a) RangeDefinition n
-checkNiceDeclaration' _ (NiceField r _ _ _ _ _ _)
+checkNiceDeclaration _ (NiceField r _ _ _ _ _ _)
   = throwError (ErrorInternal (ErrorUnexpected UnexpectedField) r)
-checkNiceDeclaration' c (PrimitiveFunction _ a _ n e)
+checkNiceDeclaration c (PrimitiveFunction _ a _ n e)
   = checkExpr c e >> checkName' True (fromAccess a) RangeDefinition n
-checkNiceDeclaration' c (NiceMutual _ _ _ _ ds)
+checkNiceDeclaration c (NiceMutual _ _ _ _ ds)
   = checkNiceDeclarations c ds
-checkNiceDeclaration' c (NiceModule _ a _ (N.QName n) bs ds)
+checkNiceDeclaration c (NiceModule _ a _ (N.QName n) bs ds)
   = checkNiceModule c (fromAccess a) (fromName n) bs ds
-checkNiceDeclaration' _ (NiceModule _ _ _ n@(N.Qual _ _) _ _)
+checkNiceDeclaration _ (NiceModule _ _ _ n@(N.Qual _ _) _ _)
   = throwError (ErrorInternal ErrorName (getRange n))
-checkNiceDeclaration' _ (NicePragma _ _)
+checkNiceDeclaration _ (NicePragma _ _)
   = pure mempty
-checkNiceDeclaration' c (NiceRecSig _ a _ _ _ n bs e)
+checkNiceDeclaration c (NiceRecSig _ a _ _ _ n bs e)
   = checkNiceSig c a RangeRecord n bs e
-checkNiceDeclaration' c (NiceDataSig _ a _ _ _ n bs e)
+checkNiceDeclaration c (NiceDataSig _ a _ _ _ n bs e)
   = checkNiceSig c a RangeData n bs e
-checkNiceDeclaration' _ (NiceFunClause r _ _ _ _ _ _)
+checkNiceDeclaration _ (NiceFunClause r _ _ _ _ _ _)
   = throwError (ErrorInternal (ErrorUnexpected UnexpectedNiceFunClause) r)
-checkNiceDeclaration' c (FunSig _ a _ _ _ _ _ _ n e)
+checkNiceDeclaration c (FunSig _ a _ _ _ _ _ _ n e)
   = checkExpr c e >> checkName' True (fromAccess a) RangeDefinition n
-checkNiceDeclaration' c (FunDef _ _ _ _ _ _ _ cs)
+checkNiceDeclaration c (FunDef _ _ _ _ _ _ _ cs)
   = checkClauses c cs >> pure mempty
-checkNiceDeclaration' c (NiceGeneralize _ _ _ _ _ e)
+checkNiceDeclaration c (NiceGeneralize _ _ _ _ _ e)
   = checkExpr c e >> pure mempty
-checkNiceDeclaration' _ (NiceUnquoteDecl r _ _ _ _ _ _ _)
+checkNiceDeclaration _ (NiceUnquoteDecl r _ _ _ _ _ _ _)
   = throwError (ErrorUnsupported UnsupportedUnquote r)
-checkNiceDeclaration' _ (NiceUnquoteDef r _ _ _ _ _ _)
+checkNiceDeclaration _ (NiceUnquoteDef r _ _ _ _ _ _)
   = throwError (ErrorUnsupported UnsupportedUnquote r)
 
-checkNiceDeclaration' c
+checkNiceDeclaration c
   (NiceModuleMacro r _ (N.NoName _ _)
     (SectionApp _ [] (RawApp _ (Ident n : es))) DoOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
@@ -1110,34 +1031,34 @@ checkNiceDeclaration' c
   >>= \c' -> checkExprs c es
   >> checkImportDirective Open r n' c' i
   >>= pure . fromContext (importDirectiveAccess i)
-checkNiceDeclaration' _
+checkNiceDeclaration _
   (NiceModuleMacro r _ _ _ _ _)
   = throwError (ErrorUnsupported UnsupportedMacro r)
 
-checkNiceDeclaration' c (NiceOpen r n i)
+checkNiceDeclaration c (NiceOpen r n i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> liftLookup r n' (accessContextLookupModule n' c)
   >>= \c' -> checkImportDirective Open r n' c' i
   >>= pure . fromContext (importDirectiveAccess i)
 
-checkNiceDeclaration' _ (NiceImport r n Nothing DontOpen i)
+checkNiceDeclaration _ (NiceImport r n Nothing DontOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> checkFile (Just r) n'
   >>= \c' -> checkImportDirective Import r n' c' i
   >>= \c'' -> pure (accessContextImport n' c'')
-checkNiceDeclaration' _ (NiceImport r n Nothing DoOpen i)
+checkNiceDeclaration _ (NiceImport r n Nothing DoOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> checkFile (Just r) n'
   >>= \c' -> checkImportDirective Import r n' c' i
   >>= \c'' -> pure (accessContextImport n' c'
     <> fromContext (importDirectiveAccess i) c'')
-checkNiceDeclaration' _ (NiceImport r n (Just a) DontOpen i)
+checkNiceDeclaration _ (NiceImport r n (Just a) DontOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a)) (fromAsName a)
   >>= \a' -> checkFile (Just r) n'
   >>= \c' -> checkImportDirective Import r n' c' i
   >>= \c'' -> pure (accessContextCons a' Public c'')
-checkNiceDeclaration' _ (NiceImport r n (Just a) DoOpen i)
+checkNiceDeclaration _ (NiceImport r n (Just a) DoOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a)) (fromAsName a)
   >>= \a' -> checkFile (Just r) n'
@@ -1145,14 +1066,14 @@ checkNiceDeclaration' _ (NiceImport r n (Just a) DoOpen i)
   >>= \c'' -> pure (accessContextCons a' Public c''
     <> fromContext (importDirectiveAccess i) c'')
 
-checkNiceDeclaration' c (NiceDataDef _ _ _ _ _ n bs cs)
+checkNiceDeclaration c (NiceDataDef _ _ _ _ _ n bs cs)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> pure (accessContextLookupName n' c)
   >>= \rs -> checkLamBindings False c bs
   >>= \c' -> checkNiceConstructors rs (c <> c' \\ Just n') cs
   >>= \c'' -> pure (accessContextCons' n' Public c'' <> c'')
 
-checkNiceDeclaration' c (NiceRecDef _ _ _ _ _ n _ _ m bs ds)
+checkNiceDeclaration c (NiceRecDef _ _ _ _ _ n _ _ m bs ds)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> pure (accessContextLookupName n' c)
   >>= \rs -> checkLamBindings False c bs
@@ -1160,7 +1081,7 @@ checkNiceDeclaration' c (NiceRecDef _ _ _ _ _ n _ _ m bs ds)
   >>= \c'' -> checkDeclarationsRecord n' rs (c <> c') ds
   >>= \c''' -> pure (accessContextCons' n' Public (c'' <> c''') <> c'')
 
-checkNiceDeclaration' c (NicePatternSyn _ a n ns p)
+checkNiceDeclaration c (NicePatternSyn _ a n ns p)
   = checkNames' Public RangeVariable (unArg <$> ns)
   >>= \c' -> checkPattern Nothing (c <> c') p
   >> checkName' True (fromAccess a) RangePatternSynonym n
@@ -1169,7 +1090,6 @@ checkNiceDeclarationRecord
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => Name
   -> [Range]
@@ -1178,13 +1098,13 @@ checkNiceDeclarationRecord
   -> NiceDeclaration
   -> m AccessContext
 checkNiceDeclarationRecord _ rs c d@(Axiom _ _ _ _ _ _ _)
-  = modifyDelete (getRange d) rs >> checkNiceDeclaration c d
+  = modifyDelete rs >> checkNiceDeclaration c d
 checkNiceDeclarationRecord _ rs c d@(PrimitiveFunction _ _ _ _ _)
-  = modifyDelete (getRange d) rs >> checkNiceDeclaration c d
+  = modifyDelete rs >> checkNiceDeclaration c d
 checkNiceDeclarationRecord n rs c (NiceMutual _ _ _ _ ds)
   = checkNiceDeclarationsRecord n rs c ds
 checkNiceDeclarationRecord _ rs c d@(NiceModule _ _ _ _ _ _)
-  = modifyDelete (getRange d) rs >> checkNiceDeclaration c d
+  = modifyDelete rs >> checkNiceDeclaration c d
 checkNiceDeclarationRecord _ _ c d@(NiceModuleMacro _ _ _ _ _ _)
   = checkNiceDeclaration c d
 checkNiceDeclarationRecord _ _ c d@(NiceOpen _ _ _)
@@ -1194,13 +1114,13 @@ checkNiceDeclarationRecord _ _ c d@(NiceImport _ _ _ _ _)
 checkNiceDeclarationRecord _ _ c d@(NicePragma _ _)
   = checkNiceDeclaration c d
 checkNiceDeclarationRecord _ rs c d@(NiceRecSig _ _ _ _ _ _ _ _)
-  = modifyDelete (getRange d) rs >> checkNiceDeclaration c d
+  = modifyDelete rs >> checkNiceDeclaration c d
 checkNiceDeclarationRecord _ rs c d@(NiceDataSig _ _ _ _ _ _ _ _)
-  = modifyDelete (getRange d) rs >> checkNiceDeclaration c d
+  = modifyDelete rs >> checkNiceDeclaration c d
 checkNiceDeclarationRecord _ _ c d@(NiceFunClause _ _ _ _ _ _ _)
   = checkNiceDeclaration c d
 checkNiceDeclarationRecord _ rs c d@(FunSig _ _ _ _ _ _ _ _ _ _)
-  = modifyDelete (getRange d) rs >> checkNiceDeclaration c d
+  = modifyDelete rs >> checkNiceDeclaration c d
 checkNiceDeclarationRecord _ _ c d@(FunDef _ _ _ _ _ _ _ _)
   = checkNiceDeclaration c d
 checkNiceDeclarationRecord _ _ c d@(NiceDataDef _ _ _ _ _ _ _ _)
@@ -1227,7 +1147,6 @@ checkNiceDeclarations
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> [NiceDeclaration]
@@ -1239,7 +1158,6 @@ checkNiceDeclarationsRecord
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => Name
   -> [Range]
@@ -1254,7 +1172,6 @@ checkNiceDeclarationsTop
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> [NiceDeclaration]
@@ -1270,7 +1187,6 @@ checkNiceSig
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> C.Access
@@ -1288,7 +1204,6 @@ checkNiceConstructor
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => [Range]
   -- ^ Ranges associated with parent type.
@@ -1308,7 +1223,6 @@ checkNiceConstructors
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => [Range]
   -- ^ Ranges associated with parent type.
@@ -1321,7 +1235,6 @@ checkNiceConstructors rs
 checkNiceConstructorRecord
   :: MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => [Range]
   -- ^ Ranges associated with record type.
   -> Range
@@ -1334,7 +1247,6 @@ checkNiceConstructorRecord rs r n
 checkNiceConstructorRecordMay
   :: MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => [Range]
   -- ^ Ranges associated with record type.
   -> Maybe (Range, Name)
@@ -1348,7 +1260,6 @@ checkNiceModule
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => AccessContext
   -> Access
@@ -1396,7 +1307,6 @@ checkImportDirective
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => DirectiveType
   -> Range
   -- ^ The range of the import statement.
@@ -1419,7 +1329,6 @@ checkRenaming
   :: MonadReader Environment m
   => MonadState State m
   => MonadError Error m
-  => MonadWriter [Log] m
   => DirectiveType
   -> Context
   -> Renaming
@@ -1431,7 +1340,6 @@ checkRenamings
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => DirectiveType
   -> Context
   -> [Renaming]
@@ -1443,7 +1351,6 @@ checkImportedName
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => DirectiveType
   -> Context
   -> ImportedName
@@ -1455,7 +1362,6 @@ checkImportedNamePair
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => DirectiveType
   -> Context
   -> (Range, ImportedName, ImportedName)
@@ -1480,7 +1386,6 @@ checkImportedNames
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => DirectiveType
   -> Context
   -> [ImportedName]
@@ -1512,7 +1417,6 @@ modifyRenaming
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => DirectiveType
   -> Context
   -> Renaming
@@ -1538,7 +1442,6 @@ modifyRenamings
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => DirectiveType
   -> Context
   -> [Renaming]
@@ -1550,7 +1453,6 @@ touchModule
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => AccessContext
   -> Range
   -> QName
@@ -1562,7 +1464,6 @@ touchModuleWith
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => Either LookupError Context
   -> Range
   -> QName
@@ -1571,8 +1472,8 @@ touchModuleWith (Left LookupNotFound) _ _
   = pure ()
 touchModuleWith (Left LookupAmbiguous) r n
   = throwError (ErrorAmbiguous r n)
-touchModuleWith (Right c) r _
-  = modifyDelete r (contextRanges c)
+touchModuleWith (Right c) _ _
+  = modifyDelete (contextRanges c)
 
 importDirectiveAccess
   :: ImportDirective
@@ -1588,7 +1489,6 @@ checkModule
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => Module
   -> m Context
@@ -1601,7 +1501,6 @@ checkFile
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => Maybe Range
   -> QName
@@ -1614,7 +1513,6 @@ checkFileWith
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => Maybe ModuleState
   -> Maybe Range
@@ -1634,7 +1532,6 @@ checkFilePath
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => Maybe Range
   -> QName
@@ -1667,7 +1564,6 @@ checkRoot
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => Root
   -> m ()
@@ -1679,7 +1575,6 @@ checkRoots
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => MonadIO m
   => [Root]
   -> m ()
@@ -1688,36 +1583,15 @@ checkRoots
 
 -- ## Main
 
-type Unused
-  = Map Range RangeInfo
-
 checkUnused
   :: FilePath
   -> [Root]
-  -> IO (Either Error Unused)
+  -> IO (Either Error (Map Range RangeInfo))
 checkUnused p
-  = fmap (fmap fst)
-  . checkUnusedMay Nothing p
-
-checkUnusedLog
-  :: Range
-  -> FilePath
-  -> [Root]
-  -> IO (Either Error [Log])
-checkUnusedLog r p rs
-  = fmap snd <$> checkUnusedMay (Just r) p rs
-
-checkUnusedMay
-  :: Maybe Range
-  -> FilePath
-  -> [Root]
-  -> IO (Either Error (Unused, [Log]))
-checkUnusedMay r p
   = runExceptT
-  . runWriterT
   . fmap stateUnused
   . fmap snd
   . flip runStateT stateEmpty
-  . flip runReaderT (Environment False p r)
+  . flip runReaderT (Environment False p)
   . checkRoots
 

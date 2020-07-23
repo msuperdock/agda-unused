@@ -14,7 +14,6 @@ module Agda.Unused.Monad.Context
   , accessContextOperators
   , accessContextOperatorsP
   , accessContextPrivate
-  , accessContextSearch
   , accessContextSingleton
   , accessContextSingletonConstructor
   , accessContextUnion
@@ -351,28 +350,6 @@ accessContextLookupName
   -> [Range]
 accessContextLookupName n (AccessContext is _ _)
   = maybe [] id (Map.lookup n is >>= accessItemRangesMay)
-
-contextSearch
-  :: Range
-  -> Context
-  -> [QName]
-contextSearch r (Context is ms)
-  = Map.foldMapWithKey
-    (\n i -> QName <$> bool [] [n] (itemHasRange r i)) is
-  <> Map.foldMapWithKey
-    (\n c -> Qual n <$> contextSearch r c) ms
-
-accessContextSearch
-  :: Range
-  -> AccessContext
-  -> [QName]
-accessContextSearch r (AccessContext is ms js)
-  = Map.foldMapWithKey
-    (\n i -> QName <$> bool [] [n] (accessItemHasRange r i)) is
-  <> Map.foldMapWithKey
-    (\n (_, c) -> Qual n <$> contextSearch r c) ms
-  <> Map.foldMapWithKey
-    (\n c -> append n <$> contextSearch r c) js
 
 contextRanges
   :: Context

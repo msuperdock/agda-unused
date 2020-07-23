@@ -2,7 +2,6 @@ module Agda.Unused.Monad.State
   ( ModuleState (..)
   , State (..)
   , modifyDelete
-  , modifyDeleteRoots
   , modifyInsert
   , stateCheck
   , stateBlock
@@ -13,9 +12,7 @@ module Agda.Unused.Monad.State
 import Agda.Unused.Monad.Context
   (Context)
 import Agda.Unused.Monad.Reader
-  (Environment, askBuiltin, askRange)
-import Agda.Unused.Monad.Writer
-  (Log (..), tellLog)
+  (Environment, askBuiltin)
 import Agda.Unused.Types.Name
   (QName)
 import Agda.Unused.Types.Range
@@ -27,8 +24,8 @@ import Control.Monad.Reader
   (MonadReader)
 import Control.Monad.State
   (MonadState, modify)
-import Control.Monad.Writer
-  (MonadWriter)
+import Data.Bool
+  (bool)
 import Data.Map.Strict
   (Map)
 import qualified Data.Map.Strict
@@ -100,74 +97,19 @@ stateCheck m c (State rs ms)
 modifyInsert
   :: MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
   => Range
   -> RangeInfo
   -> m ()
 modifyInsert r i
   = askBuiltin
-  >>= \b -> askRange
-  >>= \r' -> modifyInsertWith b r' r i
-
-modifyInsertWith
-  :: MonadState State m
-  => MonadWriter [Log] m
-  => Bool
-  -- ^ Whether we are in a builtin module.
-  -> Maybe Range
-  -- ^ The range to log.
-  -> Range
-  -> RangeInfo
-  -> m ()
-modifyInsertWith True _ _ _
-  = pure ()
-modifyInsertWith False (Just r) r' i | r == r'
-  = modify (stateInsert r' i) >> tellLog StateInsert
-modifyInsertWith False _ r i
-  = modify (stateInsert r i)
+  >>= bool (modify (stateInsert r i)) (pure ())
 
 modifyDelete
   :: MonadReader Environment m
   => MonadState State m
-  => MonadWriter [Log] m
-  => Range
-  -- ^ The current range.
-  -> [Range]
-  -- ^ The ranges to delete.
-  -> m ()
-modifyDelete r rs
-  = askBuiltin
-  >>= \b -> askRange
-  >>= \r' -> modifyDeleteWith b r' (Just r) rs
-
-modifyDeleteRoots
-  :: MonadReader Environment m
-  => MonadState State m
-  => MonadWriter [Log] m
   => [Range]
-  -- ^ The ranges to delete.
   -> m ()
-modifyDeleteRoots rs
+modifyDelete rs
   = askBuiltin
-  >>= \b -> askRange
-  >>= \r -> modifyDeleteWith b r Nothing rs
-
-modifyDeleteWith
-  :: MonadState State m
-  => MonadWriter [Log] m
-  => Bool
-  -- ^ Whether we are in a builtin module.
-  -> Maybe Range
-  -- ^ The range to log.
-  -> Maybe Range
-  -- ^ The current range.
-  -> [Range]
-  -- ^ The ranges to delete.
-  -> m ()
-modifyDeleteWith True _ _ _
-  = pure ()
-modifyDeleteWith False (Just r) r' rs | elem r rs
-  = modify (stateDelete rs) >> tellLog (maybe StateDeleteRoots StateDelete r')
-modifyDeleteWith False _ _ rs
-  = modify (stateDelete rs)
+  >>= bool (modify (stateDelete rs)) (pure ())
 

@@ -43,14 +43,17 @@ unused f n
 
 main
   :: IO ()
-main = hspec $ do
-  describe "checkUnused" $ do
-    it "ignores variables in lone data signatures" $ do
-      used "Data" (QName (Name [Id "A"]))
-    it "handles record constructors within modules" $ do
-      used "Record" (QName (Name [Id "c"]))
-    it "handles variables in with-clauses" $ do
-      used "With" (QName (Name [Id "x"]))
-    it "handles variables in multiple with-clauses" $ do
-      used "With2" (QName (Name [Id "y"]))
+main
+  = hspec
+  $ describe "checkUnused"
+  $ it "handles variables in as-patterns"
+    (used "As" (QName (Name [Id "x"])))
+  >> it "handles record constructors within modules"
+    (used "Record" (QName (Name [Id "c"])))
+  >> it "handles variables in with-clauses"
+    (used "With" (QName (Name [Id "x"])))
+  >> it "handles variables in multiple with-clauses"
+    (used "With2" (QName (Name [Id "y"])))
+  >> it "ignores variables in lone data signatures"
+    (used "Data" (QName (Name [Id "A"])))
 

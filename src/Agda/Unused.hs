@@ -31,7 +31,7 @@ import Agda.Unused.Types.Name
   (Name (..), QName (..), isBuiltin, fromAsName, fromName, fromNameRange,
     fromQName, fromQNameRange, matchNames, nameIds, qNamePath)
 import Agda.Unused.Types.Range
-  (RangeInfo (..), RangeType (..))
+  (Range' (..), RangeInfo (..), RangeType (..))
 import Agda.Unused.Types.Root
   (Root (..))
 import Agda.Unused.Utils
@@ -91,6 +91,7 @@ import Prelude hiding
   ((<>))
 import qualified Prelude
   as P
+
 
 -- Change associativity to left, for consistency with (\\).
 infixl 6 <>
@@ -167,9 +168,11 @@ checkName
   -> Range
   -> Name
   -> m AccessContext
+checkName _ _ _ NoRange _
+  = pure mempty
 checkName _ _ _ _ (Name [Hole])
   = pure mempty
-checkName b a t r n
+checkName b a t r@(Range _ _) n
   = askRange
   >>= \r' -> bool (pure ()) (modifyInsert r (RangeInfo t (QName n))) b
   >> bool (pure ()) (tellLog (CheckName r n)) (r' == Just r)

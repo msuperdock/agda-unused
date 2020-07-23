@@ -35,9 +35,9 @@ module Agda.Unused.Monad.Context
 
 import Agda.Unused.Monad.Context.Item
   (AccessItem, Item, accessItem, accessItemConstructor, accessItemDefining,
-    accessItemExport, accessItemHasRange, accessItemIsConstructor,
-    accessItemPrivate, accessItemRangesMay, accessItemUnion, fromItem,
-    itemHasRange, itemInsert, itemRanges, toItem)
+    accessItemExport, accessItemIsConstructor, accessItemPrivate,
+    accessItemRangesMay, accessItemUnion, fromItem, itemInsert, itemRanges,
+    toItem)
 import Agda.Unused.Monad.Error
   (LookupError (..))
 import Agda.Unused.Monad.Reader
@@ -45,7 +45,7 @@ import Agda.Unused.Monad.Reader
 import Agda.Unused.Types.Access
   (Access (..), access)
 import Agda.Unused.Types.Name
-  (Name, QName (..), append, isOperator, stripPrefix)
+  (Name, QName (..), isOperator, stripPrefix)
 import Agda.Unused.Types.Range
   (Range)
 import Agda.Unused.Utils
@@ -53,8 +53,6 @@ import Agda.Unused.Utils
 
 import Control.Monad.Reader
   (MonadReader)
-import Data.Bool
-  (bool)
 import Data.Map.Strict
   (Map)
 import qualified Data.Map.Strict

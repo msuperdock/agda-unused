@@ -5,13 +5,13 @@ module Agda.Unused.Monad.Context.Item
   , accessItemConstructor
   , accessItemDefining
   , accessItemExport
-  , accessItemHasRange
+  -- , accessItemHasRange
   , accessItemIsConstructor
   , accessItemPrivate
   , accessItemRangesMay
   , accessItemUnion
   , fromItem
-  , itemHasRange
+  -- , itemHasRange
   , itemInsert
   , itemRanges
   , toItem
@@ -148,20 +148,6 @@ accessItemRangesMay (AccessItem _ True _)
   = Nothing
 accessItemRangesMay i
   = Just (accessItemRanges i)
-
-itemHasRange
-  :: Range
-  -> Item
-  -> Bool
-itemHasRange r
-  = elem r . itemRanges
-
-accessItemHasRange
-  :: Range
-  -> AccessItem
-  -> Bool
-accessItemHasRange r
-  = elem r . accessItemRanges
 
 fromItem
   :: Access

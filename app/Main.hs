@@ -21,10 +21,43 @@ import qualified Data.Text
   as T
 import qualified Data.Text.IO
   as I
+import Options.Applicative
+  (InfoMod, Parser, ParserInfo, execParser, fullDesc, header, help, helper,
+    info, long, metavar, progDesc, short, strOption, value)
 import System.Directory
   (doesFileExist, getCurrentDirectory)
 import System.FilePath
   ((</>))
+
+-- ## Options
+
+filePath
+  :: FilePath
+  -- ^ The default file path.
+  -> Parser FilePath
+filePath p
+  = strOption
+  $ short 'r'
+  <> long "root"
+  <> metavar "ROOT"
+  <> help "Path of project root directory"
+  <> value p
+
+optionsInfo
+  :: InfoMod a
+optionsInfo
+  = fullDesc
+  <> progDesc "Check for unused code in project with root directory ROOT"
+  <> header "agda-unused - check for unused code in an Agda project"
+
+options
+  :: FilePath
+  -- ^ The default file path.
+  -> ParserInfo FilePath
+options p
+  = info (helper <*> filePath p) optionsInfo
+
+-- ## Errors
 
 data Error where
  
@@ -44,12 +77,21 @@ printError (ErrorFile p)
 printError (ErrorParse t)
   = t
 
-main'
+-- ## Check
+
+check
+  :: FilePath
+  -> IO ()
+check p
+  = runExceptT (check' p)
+  >>= either (I.putStr . printError) (const (pure ()))
+
+check'
   :: MonadError Error m
   => MonadIO m
   => FilePath
   -> m ()
-main' p = do
+check' p = do
   configPath
     <- pure (p </> ".roots")
   exists
@@ -66,9 +108,12 @@ main' p = do
     <- liftIO (I.putStr (either P.printError P.printUnused checkResult))
   pure ()
 
+-- ## Main
+
 main
   :: IO ()
 main
-  = runExceptT (main' "/data/code/prover/src")
-  >>= either (I.putStr . printError) (const (pure ()))
+  = getCurrentDirectory
+  >>= execParser . options
+  >>= check
 

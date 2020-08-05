@@ -5,9 +5,9 @@ module Agda.Unused
 import Agda.Unused.Monad.Context
   (AccessContext, Context, (\\), accessContextClear, accessContextCons,
     accessContextCons', accessContextDefiningMay, accessContextExport,
-    accessContextImport, accessContextLookup, accessContextLookupModule,
-    accessContextLookupName, accessContextOperators, accessContextOperatorsP,
-    accessContextPrivate, accessContextSingleton,
+    accessContextImport, accessContextLookup, accessContextLookupConstructor,
+    accessContextLookupModule, accessContextLookupName, accessContextOperators,
+    accessContextOperatorsP, accessContextPrivate, accessContextSingleton,
     accessContextSingletonConstructor, accessContextUnion, contextCons,
     contextDelete, contextDeleteModule, contextInsert, contextInsertAll,
     contextInsertModule, contextLookup, contextLookupItem, contextLookupModule,
@@ -206,20 +206,22 @@ checkQNameP
 checkQNameP (Just (Name ps)) _ _ (QName (Name [p])) | elem p ps
   = pure mempty
 checkQNameP _ c r n
-  = checkQNamePWith (accessContextLookup n c) c r n
+  = checkQNamePWith (accessContextLookupConstructor n c) c r n
 
 checkQNamePWith
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => Either LookupError [Range]
+  => Maybe Bool
   -> AccessContext
   -> Range
   -> QName
   -> m AccessContext
-checkQNamePWith (Left LookupNotFound) _ r n
+checkQNamePWith Nothing _ r n
   = checkQName Public RangeVariable r n
-checkQNamePWith _ c r n
+checkQNamePWith (Just False) _ _ _
+  = pure mempty
+checkQNamePWith (Just True) c r n
   = touchQName c r n >> pure mempty
 
 checkQNameP'

@@ -9,6 +9,7 @@ module Agda.Unused.Monad.Context
   , accessContextExport
   , accessContextImport
   , accessContextLookup
+  , accessContextLookupConstructor
   , accessContextLookupModule
   , accessContextLookupName
   , accessContextOperators
@@ -36,8 +37,8 @@ module Agda.Unused.Monad.Context
 import Agda.Unused.Monad.Context.Item
   (AccessItem, Item, accessItem, accessItemConstructor, accessItemDefining,
     accessItemExport, accessItemIsConstructor, accessItemPrivate,
-    accessItemRangesMay, accessItemUnion, fromItem, itemInsert, itemRanges,
-    toItem)
+    accessItemRanges, accessItemUnion, fromItem, itemInsert, itemIsConstructor,
+    itemRanges, toItem)
 import Agda.Unused.Monad.Error
   (LookupError (..))
 import Agda.Unused.Monad.Reader
@@ -285,6 +286,13 @@ contextLookupModule (QName n) (Context _ ms)
 contextLookupModule (Qual n ns) (Context _ ms)
   = Map.lookup n ms >>= contextLookupModule ns
 
+contextLookupConstructor
+  :: QName
+  -> Context
+  -> Maybe Bool
+contextLookupConstructor n c
+  = itemIsConstructor <$> contextLookupItem n c
+
 accessContextLookup
   :: QName
   -> AccessContext
@@ -346,7 +354,14 @@ accessContextLookupName
   -> AccessContext
   -> [Range]
 accessContextLookupName n (AccessContext is _ _)
-  = maybe [] id (Map.lookup n is >>= accessItemRangesMay)
+  = maybe [] accessItemRanges (Map.lookup n is)
+
+accessContextLookupConstructor
+  :: QName
+  -> AccessContext
+  -> Maybe Bool
+accessContextLookupConstructor n c
+  = contextLookupConstructor n (toContext c)
 
 contextRanges
   :: Context

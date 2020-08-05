@@ -5,14 +5,13 @@ module Agda.Unused.Monad.Context.Item
   , accessItemConstructor
   , accessItemDefining
   , accessItemExport
-  -- , accessItemHasRange
   , accessItemIsConstructor
   , accessItemPrivate
-  , accessItemRangesMay
+  , accessItemRanges
   , accessItemUnion
   , fromItem
-  -- , itemHasRange
   , itemInsert
+  , itemIsConstructor
   , itemRanges
   , toItem
   ) where
@@ -116,12 +115,20 @@ accessItemDefining i@(AccessItemConstructor _ _)
 accessItemDefining (AccessItem a _ rs)
   = AccessItem a True rs
 
+itemIsConstructor
+  :: Item
+  -> Bool
+itemIsConstructor (ItemConstructor _)
+  = True
+itemIsConstructor (Item _)
+  = False
+
 accessItemIsConstructor
   :: AccessItem
   -> Bool
 accessItemIsConstructor (AccessItemConstructor _ _)
   = True
-accessItemIsConstructor _
+accessItemIsConstructor (AccessItem _ _ _)
   = False
 
 itemRanges
@@ -132,22 +139,12 @@ itemRanges (ItemConstructor rs)
 itemRanges (Item rs)
   = rs
 
+-- Return empty list if defining.
 accessItemRanges
   :: AccessItem
   -> [Range]
-accessItemRanges (AccessItemConstructor rs ss)
-  = rs <> ss
-accessItemRanges (AccessItem _ _ rs)
-  = rs
-
--- Return Nothing if defining.
-accessItemRangesMay
-  :: AccessItem
-  -> Maybe [Range]
-accessItemRangesMay (AccessItem _ True _)
-  = Nothing
-accessItemRangesMay i
-  = Just (accessItemRanges i)
+accessItemRanges i
+  = maybe [] itemRanges (toItem i)
 
 fromItem
   :: Access

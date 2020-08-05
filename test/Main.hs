@@ -76,30 +76,38 @@ main
     (used "Binding" "z" >> unused "Binding" "w")
   >> it "checks variables bound to implicit function arguments"
     (used "Binding" "x" >> unused "Binding" "y")
+  >> it "checks variables bound in do-blocks"
+    (used "Do" "y" >> unused "Do" "z")
+  >> it "checks variables bound in let-blocks"
+    (used "Let" "y" >> unused "Let" "z")
+  >> it "checks variables bound in where-blocks"
+    (used "Where" "y" >> unused "Where" "z")
+  >> it "checks variables in as-patterns"
+    (used "As" "x" >> unused "As" "z" >> unused "As" "w")
+  >> it "checks definitions"
+    (used "Definition" "f" >> unused "Definition" "g")
+  >> it "checks postulates"
+    (used "Postulate" "f" >> unused "Postulate" "g")
 
--- checks variables bound in do-blocks.
--- checks variables bound in let-blocks.
--- checks variables bound in where-blocks.
-
--- checks ordinary functions.
--- checks postulates.
-
-  -- TODO: make these follow pattern above?
-  >> it "handles variables in as-patterns"
-    (used "As" "x")
   >> it "handles variables in with-clauses"
     (used "With" "x")
   >> it "handles variables in multiple with-clauses"
     (used "With2" "y")
-
   >> it "handles record constructors in modules"
     (used "Record" "c")
+  >> it "handles syntax declarations"
+    (used "Syntax" "S")
+  >> it "handles imported syntax declarations"
+    (used "Syntax2" "S")
 
   >> it "ignores variables in lone data signatures"
     (used "Data" "A")
+  >> it "ignores constructors in function definitions"
+    (used "Constructor" "false" >> used "Constructor" "true")
   >> it "ignores constructors in pattern-matching lambdas"
     (used "Lambda3" "false")
-
--- ignores constructors in [...].
--- ignores unnamed functions.
+  >> it "ignores patterns in function definitions"
+    (used "Pattern" "p" >> used "Pattern2" ",")
+  >> it "ignores unnamed definitions"
+    (used "Underscore" "_")
 

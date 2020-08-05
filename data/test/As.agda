@@ -4,7 +4,8 @@ f
   : {A : Set}
   → A
   → A
-f x@y
+  → A
+f x@y z@w
   with y
 ... | _
   = x

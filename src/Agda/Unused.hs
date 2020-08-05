@@ -86,6 +86,8 @@ import Prelude hiding
 import qualified Prelude
   as P
 
+import Debug.Trace
+  (trace)
 
 -- Change associativity to left, for consistency with (\\).
 infixl 6 <>
@@ -438,9 +440,9 @@ checkPattern _ _ (WildP _)
   = pure mempty
 checkPattern _ _ (AbsurdP _)
   = pure mempty
-checkPattern m c (AsP _ n p)
-  = (<>) <$> checkName' True Public RangeVariable n
-    <*> checkPattern Nothing (c \\ m) p
+checkPattern m c p'@(AsP _ n p)
+  = trace (show p' <> "\n") ((<>) <$> checkName' True Public RangeVariable n
+    <*> checkPattern Nothing (c \\ m) p)
 checkPattern m c (DotP _ e)
   = checkExpr (c \\ m) e >> pure mempty
 checkPattern _ _ (LitP _)

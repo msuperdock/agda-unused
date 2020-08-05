@@ -162,11 +162,13 @@ fromItem a (Item rs)
  
 toItem
   :: AccessItem
-  -> Item
+  -> Maybe Item
 toItem (AccessItemConstructor rs ss)
-  = ItemConstructor (rs <> ss)
-toItem (AccessItem _ _ rs)
-  = Item rs
+  = Just (ItemConstructor (rs <> ss))
+toItem (AccessItem _ False rs)
+  = Just (Item rs)
+toItem (AccessItem _ True _)
+  = Nothing
 
 accessItemExport
   :: AccessItem

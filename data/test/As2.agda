@@ -1,4 +1,4 @@
-module As where
+module As2 where
 
 f
   : {A : Set}
@@ -6,5 +6,7 @@ f
   → A
   → A
 f x@y z@w
+  with y
+... | _
   = x
 

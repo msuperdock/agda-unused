@@ -83,7 +83,7 @@ main
   >> it "checks variables bound in where-blocks"
     (used "Where" "y" >> unused "Where" "z")
   >> it "checks variables in as-patterns"
-    (used "As" "x" >> unused "As" "z" >> unused "As" "w")
+    (used "As" "x" >> unused "As" "y" >> unused "As" "z" >> unused "As" "w")
   >> it "checks definitions"
     (used "Definition" "f" >> unused "Definition" "g")
   >> it "checks postulates"
@@ -93,6 +93,8 @@ main
     (used "With" "x")
   >> it "handles variables in multiple with-clauses"
     (used "With2" "y")
+  >> it "handles variables in as-patterns followed by with-clauses"
+    (used "As2" "x" >> unused "As2" "z" >> unused "As2" "w")
   >> it "handles record constructors in modules"
     (used "Record" "c")
   >> it "handles syntax declarations"
@@ -110,4 +112,6 @@ main
     (used "Pattern" "p" >> used "Pattern2" ",")
   >> it "ignores unnamed definitions"
     (used "Underscore" "_")
+  >> it "ignores recursive calls to the function being defined"
+    (unused "Recursive" "snoc")
 

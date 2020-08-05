@@ -285,7 +285,6 @@ contextLookupModule (QName n) (Context _ ms)
 contextLookupModule (Qual n ns) (Context _ ms)
   = Map.lookup n ms >>= contextLookupModule ns
 
--- Return Nothing if we are currently defining an item with this name.
 accessContextLookup
   :: QName
   -> AccessContext
@@ -380,7 +379,7 @@ toContext
   :: AccessContext
   -> Context
 toContext (AccessContext is ms _)
-  = Context (Map.map toItem is) (Map.map snd ms)
+  = Context (Map.mapMaybe toItem is) (Map.map snd ms)
 
 -- Clear imports from context.
 accessContextClear

@@ -122,10 +122,10 @@ data Item where
 data AccessItem where
 
   AccessItemConstructor
+    -- Private ranges.
     :: ![Range]
-    -- ^ Private ranges.
+    -- Public ranges.
     -> ![Range]
-    -- ^ Public ranges.
     -> AccessItem
 
   AccessItemPattern

@@ -1,24 +1,23 @@
 module Agda.Unused.Types.Name
-  ( Name (..)
-  , NamePart (..)
-  , QName (..)
+  ( Name(..)
+  , NamePart(..)
+  , QName(..)
   , fromAsName
   , fromName
   , fromNameRange
   , fromQName
   , fromQNameRange
   , isBuiltin
-  , isOperator
-  , matchNames
+  , matchOperators
   , nameIds
   , qNamePath
   , stripPrefix
   ) where
 
 import Agda.Syntax.Concrete
-  (AsName, AsName' (..))
+  (AsName, AsName'(..))
 import Agda.Syntax.Concrete.Name
-  (NamePart (..))
+  (NamePart(..))
 import qualified Agda.Syntax.Concrete.Name
   as N
 import Agda.Syntax.Position
@@ -156,17 +155,10 @@ qNamePath (Qual n ns)
 
 -- ## Match
 
-matchName
-  :: [String]
-  -> Name
-  -> Bool
-matchName ss n
-  = isSubsequenceOf (nameIds n) ss
-
-matchNames
+matchOperators
   :: [String]
   -> [Name]
   -> [Name]
-matchNames ss
-  = filter (matchName ss)
+matchOperators ss
+  = filter (\n -> isOperator n && isSubsequenceOf (nameIds n) ss)
 

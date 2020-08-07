@@ -3,9 +3,9 @@ module Agda.Unused.Config
   ) where
 
 import Agda.Unused.Types.Name
-  (Name (..), NamePart (..), QName (..))
+  (Name(..), NamePart(..), QName(..))
 import Agda.Unused.Types.Root
-  (Root (..))
+  (Root(..))
 import Agda.Unused.Utils
   (mapLeft)
 

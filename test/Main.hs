@@ -3,11 +3,11 @@ module Main where
 import Agda.Unused
   (checkUnused)
 import Agda.Unused.Types.Name
-  (Name (..), NamePart (..), QName (..))
+  (Name(..), NamePart(..), QName(..))
 import Agda.Unused.Types.Range
   (Range, RangeInfo, rangeName)
 import Agda.Unused.Types.Root
-  (Root (..))
+  (Root(..))
 
 import Data.Map.Strict
   (Map)

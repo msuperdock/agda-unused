@@ -1,6 +1,6 @@
 module Agda.Unused.Monad.State
-  ( ModuleState (..)
-  , State (..)
+  ( ModuleState(..)
+  , State(..)
   , modifyDelete
   , modifyInsert
   , stateCheck
@@ -9,14 +9,14 @@ module Agda.Unused.Monad.State
   , stateLookup
   ) where
 
-import Agda.Unused.Monad.Context
-  (Context)
 import Agda.Unused.Monad.Reader
   (Environment, askBuiltin)
+import Agda.Unused.Types.Context
+  (Context)
 import Agda.Unused.Types.Name
   (QName)
 import Agda.Unused.Types.Range
-  (Range, Range' (..), RangeInfo)
+  (Range, Range'(..), RangeInfo)
 import Agda.Unused.Utils
   (mapDeletes)
 

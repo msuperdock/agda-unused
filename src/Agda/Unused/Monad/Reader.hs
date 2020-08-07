@@ -1,5 +1,5 @@
 module Agda.Unused.Monad.Reader
-  ( Environment (..)
+  ( Environment(..)
   , askBuiltin
   , askRoot
   , localBuiltin

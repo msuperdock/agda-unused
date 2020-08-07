@@ -1,5 +1,5 @@
 module Agda.Unused.Types.Root
-  ( Root (..)
+  ( Root(..)
   ) where
 
 import Agda.Unused.Types.Name

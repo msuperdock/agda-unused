@@ -1,5 +1,5 @@
 module Agda.Unused.Types.Access
-  ( Access (..)
+  ( Access(..)
   , access
   , fromAccess
   ) where

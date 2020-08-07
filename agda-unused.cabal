@@ -19,13 +19,12 @@ library
   exposed-modules:
     Agda.Unused
     Agda.Unused.Config
-    Agda.Unused.Monad.Context
-    Agda.Unused.Monad.Context.Item
     Agda.Unused.Monad.Error
     Agda.Unused.Monad.Reader
     Agda.Unused.Monad.State
     Agda.Unused.Print
     Agda.Unused.Types.Access
+    Agda.Unused.Types.Context
     Agda.Unused.Types.Name
     Agda.Unused.Types.Range
     Agda.Unused.Types.Root

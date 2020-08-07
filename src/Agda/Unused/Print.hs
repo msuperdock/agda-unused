@@ -7,11 +7,11 @@ module Agda.Unused.Print
   ) where
 
 import Agda.Unused.Monad.Error
-  (Error (..), InternalError (..), UnexpectedError (..), UnsupportedError (..))
+  (Error(..), InternalError(..), UnexpectedError(..), UnsupportedError(..))
 import Agda.Unused.Types.Name
-  (Name (..), NamePart (..), QName (..))
+  (Name(..), NamePart(..), QName(..))
 import Agda.Unused.Types.Range
-  (Range, Range' (..), RangeInfo (..), RangeType (..), getRange)
+  (Range, Range'(..), RangeInfo(..), RangeType(..), getRange)
 
 import Agda.Utils.Pretty
   (prettyShow)

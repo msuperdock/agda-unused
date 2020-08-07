@@ -1,14 +1,16 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module Agda.Unused.Monad.Error
-  ( Error (..)
-  , InternalError (..)
-  , LookupError (..)
-  , UnexpectedError (..)
-  , UnsupportedError (..)
+  ( Error(..)
+  , InternalError(..)
+  , LookupError(..)
+  , UnexpectedError(..)
+  , UnsupportedError(..)
   , liftLookup
   ) where
 
+import Agda.Unused.Types.Context
+  (LookupError(..))
 import Agda.Unused.Types.Name
   (QName)
 import Agda.Unused.Types.Range
@@ -17,7 +19,7 @@ import Agda.Unused.Types.Range
 import Agda.Syntax.Concrete.Definitions
   (DeclarationException)
 import Agda.Syntax.Concrete.Fixity
-  (MonadFixityError (..))
+  (MonadFixityError(..))
 import Agda.Syntax.Parser
   (ParseError)
 import Control.Monad.Except
@@ -158,16 +160,6 @@ instance (Monad m, MonadError Error m) => MonadFixityError m where
     = pure ()
 
 -- ## Lookup
-
-data LookupError where
-
-  LookupNotFound
-    :: LookupError
-
-  LookupAmbiguous
-    :: LookupError
-
-  deriving Show
 
 liftLookup
   :: MonadError Error m

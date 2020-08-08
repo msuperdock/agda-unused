@@ -1366,7 +1366,6 @@ checkImportedNames
 checkImportedNames t
   = checkSequence (checkImportedName t)
 
--- Should we delete both in one case?
 modifyHiding
   :: MonadError Error m
   => Context

@@ -1,10 +1,10 @@
 module Variable where
 
-f₀
+f
   : {A : Set}
   → A
   → A
   → A
-f₀ x y
+f x y
   = x
 

@@ -13,15 +13,15 @@ import Agda.Unused.Monad.State
 import Agda.Unused.Types.Access
   (Access(..), fromAccess)
 import Agda.Unused.Types.Context
-  (AccessContext, Context, LookupError(..), accessContextDefining,
+  (AccessContext, Context, LookupError(..), accessContextDefine,
     accessContextImport, accessContextItem, accessContextLookup,
-    accessContextLookupModule, accessContextLookupSpecial, accessContextMatch,
-    accessContextMatchPattern, accessContextModule, accessContextModule',
-    accessContextUnion, accessItem, accessItemConstructor, contextDelete,
-    contextDeleteModule, contextInsertRange, contextInsertRangeAll,
-    contextInsertRangeModule, contextItem, contextLookup, contextLookupItem,
-    contextLookupModule, contextModule, contextRanges, contextRename,
-    contextRenameModule, fromContext, toContext)
+    accessContextLookupDefining, accessContextLookupModule,
+    accessContextLookupSpecial, accessContextMatch, accessContextModule,
+    accessContextModule', accessContextUnion, accessItem, accessItemConstructor,
+    contextDelete, contextDeleteModule, contextInsertRange,
+    contextInsertRangeAll, contextInsertRangeModule, contextItem, contextLookup,
+    contextLookupItem, contextLookupModule, contextModule, contextRanges,
+    contextRename, contextRenameModule, fromContext, toContext)
 import Agda.Unused.Types.Name
   (Name(..), QName(..), isBuiltin, fromAsName, fromName, fromNameRange,
     fromQName, fromQNameRange, nameIds, qNamePath)
@@ -231,7 +231,20 @@ touchName
   -> Name
   -> m ()
 touchName c n
-  = either (const (pure ())) modifyDelete (accessContextLookup (QName n) c)
+  = askBuiltin
+  >>= \b -> touchNameWith b (accessContextLookupDefining (QName n) c)
+
+touchNameWith
+  :: MonadReader Environment m
+  => MonadState State m
+  => Bool
+  -- ^ Whether we are in a builtin module.
+  -> Either LookupError (Bool, [Range])
+  -> m ()
+touchNameWith False (Right (False, rs))
+  = modifyDelete rs
+touchNameWith _ _
+  = pure ()
 
 touchNames
   :: MonadReader Environment m
@@ -251,7 +264,8 @@ touchQName
   -> QName
   -> m ()
 touchQName c r n
-  = askBuiltin >>= \b -> touchQNameWith b (accessContextLookup n c) r n
+  = askBuiltin
+  >>= \b -> touchQNameWith b (accessContextLookupDefining n c) r n
 
 touchQNameWith
   :: MonadError Error m
@@ -259,18 +273,14 @@ touchQNameWith
   => MonadState State m
   => Bool
   -- ^ Whether we are in a builtin module.
-  -> Either LookupError [Range]
+  -> Either LookupError (Bool, [Range])
   -> Range
   -> QName
   -> m ()
-touchQNameWith False (Left LookupNotFound) _ _
-  = pure ()
 touchQNameWith False (Left LookupAmbiguous) r n
   = throwError (ErrorAmbiguous r n)
-touchQNameWith False (Right rs) _ _
-  = modifyDelete rs
-touchQNameWith True _ _ _
-  = pure ()
+touchQNameWith b rs _ _
+  = touchNameWith b rs
 
 touchQNameContext
   :: MonadReader Environment m
@@ -464,7 +474,7 @@ checkRawAppP
   -> [Pattern]
   -> m AccessContext
 checkRawAppP c ps
-  = pure (accessContextMatchPattern (patternNames ps) c)
+  = pure (accessContextMatch (patternNames ps) c)
   >>= \ns -> touchNames c ns
   >> checkPatterns c (patternDelete ns ps)
 
@@ -742,7 +752,7 @@ checkClause
   -> Clause
   -> m AccessContext
 checkClause c (Clause n _ l r w cs)
-  = pure (maybe id accessContextDefining (fromName n) c)
+  = pure (maybe id accessContextDefine (fromName n) c)
   >>= \c' -> checkLHS c' l
   >>= \c'' -> checkWhereClause (c' <> c'') w
   >>= \(m, c''') -> checkRHS (c' <> c'' <> c''') r
@@ -898,8 +908,52 @@ checkDoStmts
   => AccessContext
   -> [DoStmt]
   -> m AccessContext
-checkDoStmts
-  = checkFold checkDoStmt
+checkDoStmts c ss
+  = bool (pure ()) (touchName c bind) (hasBind ss)
+  >> bool (pure ()) (touchName c bind_) (hasBind_ ss)
+  >> checkFold checkDoStmt c ss
+
+hasBind
+  :: [DoStmt]
+  -> Bool
+hasBind []
+  = False
+hasBind (_ : [])
+  = False
+hasBind (DoBind _ _ _ _ : _ : _)
+  = True
+hasBind (_ : ss)
+  = hasBind ss
+
+hasBind_
+  :: [DoStmt]
+  -> Bool
+hasBind_ []
+  = False
+hasBind_ (_ : [])
+  = False
+hasBind_ (DoThen _ : _ : _)
+  = True
+hasBind_ (_ : ss)
+  = hasBind_ ss
+
+bind
+  :: Name
+bind
+  = Name
+  [ Hole
+  , Id ">>="
+  , Hole
+  ]
+
+bind_
+  :: Name
+bind_
+  = Name
+  [ Hole
+  , Id ">>"
+  , Hole
+  ]
 
 -- ## Declarations
 
@@ -1043,7 +1097,7 @@ checkNiceDeclaration c (NiceDataDef _ _ _ _ _ n bs cs)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> pure (either (const []) id (accessContextLookup (QName n') c))
   >>= \rs -> checkLamBindings False c bs
-  >>= \c' -> checkNiceConstructors rs (accessContextDefining n' c <> c') cs
+  >>= \c' -> checkNiceConstructors rs (accessContextDefine n' c <> c') cs
   >>= \c'' -> pure (accessContextModule' n' Public c'' <> c'')
 
 checkNiceDeclaration c (NiceRecDef _ _ _ _ _ n _ _ m bs ds)
@@ -1110,7 +1164,7 @@ checkNiceDeclarationRecord _ _ c d@(NiceUnquoteDef _ _ _ _ _ _ _)
   = checkNiceDeclaration c d
 
 checkNiceDeclarationRecord n rs c (NiceField _ a _ _ _ n' (Arg _ e))
-  = checkExpr (accessContextDefining n c) e
+  = checkExpr (accessContextDefine n c) e
   >> maybe
     (pure mempty)
     (\n'' -> pure (accessContextItem n''

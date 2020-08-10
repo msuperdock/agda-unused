@@ -24,6 +24,7 @@ module Agda.Unused.Types.Context
   , contextLookupModule
   , accessContextLookup
   , accessContextLookupModule
+  , accessContextLookupDefining
   , accessContextLookupSpecial
   
     -- ** Insert
@@ -42,9 +43,9 @@ module Agda.Unused.Types.Context
   , contextRename
   , contextRenameModule
 
-    -- ** Defining
+    -- ** Define
 
-  , accessContextDefining
+  , accessContextDefine
 
     -- ** Ranges
 
@@ -53,7 +54,6 @@ module Agda.Unused.Types.Context
     -- ** Match
 
   , accessContextMatch
-  , accessContextMatchPattern
 
     -- * Construction
 
@@ -346,6 +346,28 @@ resolve (x : [])
 resolve (_ : _ : _)
   = Left LookupAmbiguous
 
+accessItemDefining
+  :: AccessItem
+  -> Bool
+accessItemDefining (AccessItemDefining _ _)
+  = True
+accessItemDefining _
+  = False
+
+-- | Like 'accessContextLookup', but also return a boolean indicating whether we
+-- are currently defining the referenced item.
+accessContextLookupDefining
+  :: QName
+  -> AccessContext
+  -> Either LookupError (Bool, [Range])
+accessContextLookupDefining (QName n) (AccessContext is _ _)
+  = maybe
+    (Left LookupNotFound)
+    (\i -> Right (accessItemDefining i, accessItemRanges i))
+    (Map.lookup n is)
+accessContextLookupDefining n@(Qual _ _) c
+  = (,) False <$> accessContextLookup n c
+
 itemSpecial
   :: Item
   -> Bool
@@ -355,12 +377,6 @@ itemSpecial (ItemPattern _)
   = True
 itemSpecial (Item _)
   = False
-
-accessItemSpecial
-  :: AccessItem
-  -> Bool
-accessItemSpecial
-  = itemSpecial . toItem'
 
 -- | Determine whether a name represents a constructor or pattern synonym.
 -- Return 'Nothing' if the name is not in context.
@@ -448,27 +464,26 @@ contextRenameModule
 contextRenameModule n n' (Context is ms)
   = Context is (mapUpdateKey n n' ms)
 
--- ### Defining
+-- ### Define
 
-accessItemDefining
+accessItemDefine
   :: AccessItem
   -> AccessItem
-accessItemDefining (AccessItem a rs)
+accessItemDefine (AccessItem a rs)
   = AccessItemDefining a rs
-accessItemDefining i
+accessItemDefine i
   = i
 
 -- | Mark an existing name as in process of being defined.
-accessContextDefining
+accessContextDefine
   :: Name
   -> AccessContext
   -> AccessContext
-accessContextDefining n (AccessContext is ms js)
-  = AccessContext (Map.adjust accessItemDefining n is) ms js
+accessContextDefine n (AccessContext is ms js)
+  = AccessContext (Map.adjust accessItemDefine n is) ms js
 
 -- ### Ranges
 
--- Get all ranges associated with the given item.
 itemRanges
   :: Item
   -> [Range]
@@ -478,6 +493,12 @@ itemRanges (ItemPattern rs)
   = rs
 itemRanges (Item rs)
   = rs
+
+accessItemRanges
+  :: AccessItem
+  -> [Range]
+accessItemRanges
+  = itemRanges . toItem'
 
 -- | Get all ranges associated with names in the given context.
 contextRanges
@@ -496,14 +517,6 @@ accessContextMatch
   -> [Name]
 accessContextMatch ss (AccessContext is _ _)
   = matchOperators ss (Map.keys is)
-
--- | Like 'accessContextMatch', restricted to constructors or pattern synonyms.
-accessContextMatchPattern
-  :: [String]
-  -> AccessContext
-  -> [Name]
-accessContextMatchPattern ss (AccessContext is _ _)
-  = matchOperators ss (Map.keys (Map.filter accessItemSpecial is))
 
 -- ## Construction
 

@@ -35,6 +35,16 @@ name
   . (: [])
   . Id
 
+land
+  :: QName
+land
+  = QName
+  $ Name
+  [ Hole
+  , Id "&&"
+  , Hole
+  ]
+
 bind
   :: QName
 bind
@@ -68,18 +78,6 @@ testCheck
 testCheck f m us
   = testCheckNames f m (name <$> us)
 
-testCheckNames
-  :: String
-  -- ^ Folder of test file.
-  -> String
-  -- ^ Name of test module.
-  -> [QName]
-  -- ^ Expected unused names.
-  -> Expectation
-testCheckNames f m us
-  = checkUnused ("data/test" </> f) [Root (name m) []]
-  >>= testUnused (Set.fromList us)
-
 testCheckPattern
   :: String
   -- ^ Name of test module.
@@ -98,15 +96,6 @@ testCheckExpression
 testCheckExpression
   = testCheck "expression"
 
-testCheckNamesExpression
-  :: String
-  -- ^ Name of test module.
-  -> [QName]
-  -- ^ Expected unused names.
-  -> Expectation
-testCheckNamesExpression
-  = testCheckNames "expression"
-
 testCheckDeclaration
   :: String
   -- ^ Name of test module.
@@ -115,6 +104,36 @@ testCheckDeclaration
   -> Expectation
 testCheckDeclaration
   = testCheck "declaration"
+
+testCheckNames
+  :: String
+  -- ^ Folder of test file.
+  -> String
+  -- ^ Name of test module.
+  -> [QName]
+  -- ^ Expected unused names.
+  -> Expectation
+testCheckNames f m us
+  = checkUnused ("data/test" </> f) [Root (name m) []]
+  >>= testUnused (Set.fromList us)
+
+testCheckNamesPattern
+  :: String
+  -- ^ Name of test module.
+  -> [QName]
+  -- ^ Expected unused names.
+  -> Expectation
+testCheckNamesPattern
+  = testCheckNames "pattern"
+
+testCheckNamesExpression
+  :: String
+  -- ^ Name of test module.
+  -> [QName]
+  -- ^ Expected unused names.
+  -> Expectation
+testCheckNamesExpression
+  = testCheckNames "expression"
 
 testUnused
   :: Set QName
@@ -141,6 +160,8 @@ testPattern
   = describe "patterns"
   $ it "checks identifiers (IdentP)"
     (testCheckPattern "IdentP" ["y", "f", "g"])
+  >> it "checks operator applications (OpAppP)"
+    (testCheckNamesPattern "OpAppP" [land])
   >> it "checks as-patterns (AsP)"
     (testCheckPattern "AsP" ["y", "z", "w", "z'", "w'", "f", "g"])
 

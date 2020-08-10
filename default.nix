@@ -14,6 +14,6 @@ mkDerivation {
   executableHaskellDepends = [
     base directory filepath mtl optparse-applicative text
   ];
-  testHaskellDepends = [ base containers hspec ];
+  testHaskellDepends = [ base containers filepath hspec ];
   license = stdenv.lib.licenses.mit;
 }

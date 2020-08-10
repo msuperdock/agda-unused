@@ -1,4 +1,4 @@
-module DoBlock where
+module DoBlock3 where
 
 data Id
   (A : Set)
@@ -31,8 +31,6 @@ f
   → Id A
 f x
   = do
-    y <- id x
-    z <- id x
-    id y
-    id y
+    id x
+    id x
 

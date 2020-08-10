@@ -35,6 +35,26 @@ name
   . (: [])
   . Id
 
+bind
+  :: QName
+bind
+  = QName
+  $ Name
+  [ Hole
+  , Id ">>="
+  , Hole
+  ]
+
+bind_
+  :: QName
+bind_
+  = QName
+  $ Name
+  [ Hole
+  , Id ">>"
+  , Hole
+  ]
+
 -- ## Expectations
 
 testCheck
@@ -46,8 +66,19 @@ testCheck
   -- ^ Expected unused identifiers.
   -> Expectation
 testCheck f m us
+  = testCheckNames f m (name <$> us)
+
+testCheckNames
+  :: String
+  -- ^ Folder of test file.
+  -> String
+  -- ^ Name of test module.
+  -> [QName]
+  -- ^ Expected unused names.
+  -> Expectation
+testCheckNames f m us
   = checkUnused ("data/test" </> f) [Root (name m) []]
-  >>= testUnused (Set.fromList (name <$> us))
+  >>= testUnused (Set.fromList us)
 
 testCheckPattern
   :: String
@@ -66,6 +97,15 @@ testCheckExpression
   -> Expectation
 testCheckExpression
   = testCheck "expression"
+
+testCheckNamesExpression
+  :: String
+  -- ^ Name of test module.
+  -> [QName]
+  -- ^ Expected unused names.
+  -> Expectation
+testCheckNamesExpression
+  = testCheckNames "expression"
 
 testCheckDeclaration
   :: String
@@ -119,7 +159,10 @@ testExpression
   >> it "checks let-blocks (Let)"
     (testCheckExpression "Let" ["z", "f"])
   >> it "checks do-blocks (DoBlock)"
-    (testCheckExpression "DoBlock" ["z", "f"])
+    (testCheckExpression "DoBlock1" ["z", "f"]
+    >> testCheckNamesExpression "DoBlock2" [bind_, name "f"]
+    >> testCheckNamesExpression "DoBlock3" [bind, name "f"]
+    >> testCheckNamesExpression "DoBlock4" [bind, bind_, name "f"])
 
 testDeclaration
   :: Spec

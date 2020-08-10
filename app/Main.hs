@@ -73,7 +73,7 @@ printError
   :: Error
   -> Text
 printError (ErrorFile p)
-  = "error: .roots file not found " <> P.parens (T.pack p)
+  = "error: .agda-roots file not found " <> P.parens (T.pack p)
 printError (ErrorParse t)
   = t
 
@@ -93,7 +93,7 @@ check'
   -> m ()
 check' p = do
   configPath
-    <- pure (p </> ".roots")
+    <- pure (p </> ".agda-roots")
   exists
     <- liftIO (doesFileExist configPath)
   _

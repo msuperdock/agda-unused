@@ -1,4 +1,14 @@
-module Pattern2 where
+module PatternSyn where
+
+data ⊤
+  : Set
+  where
+
+  tt
+    : ⊤
+
+pattern p
+  = tt
 
 data D
   (A : Set)
@@ -14,9 +24,15 @@ pattern _,_ x y
   = d x y
 
 f
+  : ⊤
+  → ⊤
+f p
+  = tt
+
+g
   : {A : Set}
   → D A
   → A
-f (x , _)
+g (x , _)
   = x
 

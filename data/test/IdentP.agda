@@ -1,4 +1,4 @@
-module Constructor where
+module IdentP where
 
 data Bool
   : Set
@@ -11,10 +11,18 @@ data Bool
     : Bool
 
 f
+  : {A : Set}
+  → A
+  → A
+  → A
+f x y
+  = x
+
+g
   : Bool
   → Bool
-f false
+g false
   = true
-f true
+g true
   = true
 

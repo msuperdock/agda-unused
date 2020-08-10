@@ -1,4 +1,4 @@
-module Lambda3 where
+module ExtendedLam where
 
 data Bool
   : Set

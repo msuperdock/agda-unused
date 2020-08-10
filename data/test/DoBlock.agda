@@ -1,4 +1,4 @@
-module Do where
+module DoBlock where
 
 data Id
   (A : Set)
@@ -17,6 +17,14 @@ _>>=_
 id x >>= f
   = f x
 
+_>>_
+  : {A B : Set}
+  → Id A
+  → Id B
+  → Id B
+_ >> y
+  = y
+
 f
   : {A : Set}
   → A
@@ -25,5 +33,6 @@ f x
   = do
     y <- id x
     z <- id x
+    id y
     id y
 

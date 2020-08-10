@@ -1,4 +1,14 @@
-module Recursive where
+module FunClause where
+
+f
+  : {A : Set}
+  → A
+  → A
+f x
+  = y
+  where
+    y = x
+    z = x
 
 data List
   (A : Set)

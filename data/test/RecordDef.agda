@@ -1,4 +1,4 @@
-module Record where
+module RecordDef where
 
 module M where
 

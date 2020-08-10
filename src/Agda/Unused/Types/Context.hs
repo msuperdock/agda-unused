@@ -95,7 +95,7 @@ import Data.Maybe
 --
 -- - Whether the name is a constructor, pattern synonym, or ordinary definition.
 -- - A list of ranges associated with the name, which includes the site of the
--- original definition, as well as any relevant "import" or "open" statements.
+-- original definition, as well as any relevant @import@ or @open@ statements.
 data Item where
 
   ItemConstructor
@@ -234,8 +234,8 @@ accessModuleUnion _ c2
 -- x = ?
 -- @ 
 --
--- This code type-checks, and the identifier N.A refers to the postulate
--- declared in the definition of N, not the definition opened from M.
+-- This code type-checks, and the identifier @N.A@ refers to the postulate
+-- declared in the definition of @N@, not the definition opened from @M@.
 accessContextUnion
   :: AccessContext
   -> AccessContext

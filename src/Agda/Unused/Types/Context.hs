@@ -9,7 +9,6 @@ module Agda.Unused.Types.Context
   ( -- * Definitions
 
     Item
-  , AccessItem
   , Context
   , AccessContext
   , accessContextUnion
@@ -57,8 +56,8 @@ module Agda.Unused.Types.Context
 
     -- * Construction
 
-  , accessItem
-  , accessItemConstructor
+  , item
+  , itemConstructor
   , contextItem
   , contextModule
   , accessContextItem
@@ -100,14 +99,17 @@ data Item where
 
   ItemConstructor
     :: ![Range]
+    -> ![Name]
     -> Item
 
   ItemPattern
     :: ![Range]
+    -> !(Maybe Name)
     -> Item
 
   Item
     :: ![Range]
+    -> !(Maybe Name)
     -> Item
 
   deriving Show
@@ -126,21 +128,30 @@ data AccessItem where
     :: ![Range]
     -- Public ranges.
     -> ![Range]
+    -- Private syntax.
+    -> ![Name]
+    -- Public syntax.
+    -> ![Name]
     -> AccessItem
 
   AccessItemPattern
     :: !Access
     -> ![Range]
+    -> !(Maybe Name)
     -> AccessItem
 
-  AccessItemDefining
-    :: !Access
+  AccessItemSyntax
+    -- Whether the item is special.
+    :: !Bool
     -> ![Range]
     -> AccessItem
 
   AccessItem
-    :: !Access
+    -- Whether we are currently defining this item.
+    :: !Bool
+    -> !Access
     -> ![Range]
+    -> !(Maybe Name)
     -> AccessItem
 
   deriving Show
@@ -169,8 +180,8 @@ data AccessContext
 -- | If both items are constructors, collect the private and public ranges for
 -- both. Otherwise, return the second item.
 instance Semigroup AccessItem where
-  AccessItemConstructor rs1 ss1 <> AccessItemConstructor rs2 ss2
-    = AccessItemConstructor (rs1 <> rs2) (ss1 <> ss2)
+  AccessItemConstructor rs1 ss1 ts1 us1 <> AccessItemConstructor rs2 ss2 ts2 us2
+    = AccessItemConstructor (rs1 <> rs2) (ss1 <> ss2) (ts1 <> ts2) (us1 <> us2)
   _ <> i
     = i
 
@@ -197,9 +208,9 @@ accessItemUnion
   :: AccessItem
   -> AccessItem
   -> AccessItem
-accessItemUnion i@(AccessItem Public _) (AccessItemConstructor _ [])
+accessItemUnion i@(AccessItem _ Public _ _) (AccessItemConstructor _ [] _ _)
   = i
-accessItemUnion i@(AccessItem Public _) (AccessItem Private _)
+accessItemUnion i@(AccessItem _ Public _ _) (AccessItem _ Private _ _)
   = i
 accessItemUnion i1 i2
   = i1 <> i2
@@ -349,8 +360,8 @@ resolve (_ : _ : _)
 accessItemDefining
   :: AccessItem
   -> Bool
-accessItemDefining (AccessItemDefining _ _)
-  = True
+accessItemDefining (AccessItem b _ _ _)
+  = b
 accessItemDefining _
   = False
 
@@ -371,11 +382,11 @@ accessContextLookupDefining n@(Qual _ _) c
 itemSpecial
   :: Item
   -> Bool
-itemSpecial (ItemConstructor _)
+itemSpecial (ItemConstructor _ _)
   = True
-itemSpecial (ItemPattern _)
+itemSpecial (ItemPattern _ _)
   = True
-itemSpecial (Item _)
+itemSpecial (Item _ _)
   = False
 
 -- | Determine whether a name represents a constructor or pattern synonym.
@@ -393,12 +404,12 @@ itemInsertRange
   :: Range
   -> Item
   -> Item
-itemInsertRange r (ItemConstructor rs)
-  = ItemConstructor (r : rs)
-itemInsertRange r (ItemPattern rs)
-  = ItemPattern (r : rs)
-itemInsertRange r (Item rs)
-  = Item (r : rs)
+itemInsertRange r (ItemConstructor rs ss)
+  = ItemConstructor (r : rs) ss
+itemInsertRange r (ItemPattern rs s)
+  = ItemPattern (r : rs) s
+itemInsertRange r (Item rs s)
+  = Item (r : rs) s
 
 -- | Insert a range for the given name, if present.
 contextInsertRange
@@ -469,8 +480,8 @@ contextRenameModule n n' (Context is ms)
 accessItemDefine
   :: AccessItem
   -> AccessItem
-accessItemDefine (AccessItem a rs)
-  = AccessItemDefining a rs
+accessItemDefine (AccessItem _ a rs s)
+  = AccessItem True a rs s
 accessItemDefine i
   = i
 
@@ -487,11 +498,11 @@ accessContextDefine n (AccessContext is ms js)
 itemRanges
   :: Item
   -> [Range]
-itemRanges (ItemConstructor rs)
+itemRanges (ItemConstructor rs _)
   = rs
-itemRanges (ItemPattern rs)
+itemRanges (ItemPattern rs _)
   = rs
-itemRanges (Item rs)
+itemRanges (Item rs _)
   = rs
 
 accessItemRanges
@@ -520,47 +531,23 @@ accessContextMatch ss (AccessContext is _ _)
 
 -- ## Construction
 
--- data AccessItem where
+-- | Construct an 'Item' representing an ordinary definition.
+item
+  :: [Range]
+  -> Maybe Name
+  -> Item
+item rs s
+  = Item rs s
 
---   AccessItemConstructor
---     :: ![Range]
---     -- ^ Private ranges.
---     -> ![Range]
---     -- ^ Public ranges.
---     -> AccessItem
-
---   AccessItemPattern
---     :: !Access
---     -> ![Range]
---     -> AccessItem
-
---   AccessItemDefining
---     :: !Access
---     -> ![Range]
---     -> AccessItem
-
---   AccessItem
---     :: !Access
---     -> ![Range]
---     -> AccessItem
-
--- | Construct an 'AccessItem' representing an ordinary definition.
-accessItem
-  :: Access
-  -> [Range]
-  -> AccessItem
-accessItem
-  = AccessItem
-
--- | Construct an 'AccessItem' representing a constructor.
-accessItemConstructor
-  :: Access
-  -> [Range]
-  -> AccessItem
-accessItemConstructor Private rs
-  = AccessItemConstructor rs []
-accessItemConstructor Public rs
-  = AccessItemConstructor [] rs
+-- | Construct an 'Item' representing a constructor.
+itemConstructor
+  :: [Range]
+  -> Maybe Name
+  -> Item
+itemConstructor rs Nothing
+  = ItemConstructor rs []
+itemConstructor rs (Just s)
+  = ItemConstructor rs [s]
 
 -- | Construct a 'Context' with a single item.
 contextItem
@@ -578,13 +565,15 @@ contextModule
 contextModule n c
   = Context mempty (Map.singleton n c)
 
--- | Construct an 'AccessContext' with a single item.
+-- | Construct an 'AccessContext' with a single item, along with the relevant
+-- syntax item if applicable.
 accessContextItem
   :: Name
-  -> AccessItem
+  -> Access
+  -> Item
   -> AccessContext
-accessContextItem n i
-  = AccessContext (Map.singleton n i) mempty mempty
+accessContextItem n a i
+  = fromContext a (contextItem n i)
 
 -- | Construct an 'AccessContext' with a single module.
 accessContextModule
@@ -593,7 +582,7 @@ accessContextModule
   -> Context
   -> AccessContext
 accessContextModule n a c
-  = AccessContext mempty (Map.singleton n (a, c)) mempty
+  = fromContext a (contextModule n c)
 
 -- | Like 'accessContextModule', but first convert the given access context to
 -- an ordinary context using 'toContext':
@@ -624,38 +613,48 @@ fromItem
   :: Access
   -> Item
   -> AccessItem
-fromItem Private (ItemConstructor rs)
-  = AccessItemConstructor rs []
-fromItem Public (ItemConstructor rs)
-  = AccessItemConstructor [] rs
-fromItem a (ItemPattern rs)
-  = AccessItemPattern a rs
-fromItem a (Item rs)
-  = AccessItem a rs
+fromItem Private (ItemConstructor rs ss)
+  = AccessItemConstructor rs [] ss []
+fromItem Public (ItemConstructor rs ss)
+  = AccessItemConstructor [] rs [] ss
+fromItem a (ItemPattern rs s)
+  = AccessItemPattern a rs s
+fromItem a (Item rs s)
+  = AccessItem False a rs s
+
+fromItemSyntax
+  :: Item
+  -> [(Name, AccessItem)]
+fromItemSyntax (ItemConstructor rs ss)
+  = flip (,) (AccessItemSyntax True rs) <$> ss
+fromItemSyntax (ItemPattern rs s)
+  = flip (,) (AccessItemSyntax True rs) <$> maybe [] (: []) s
+fromItemSyntax (Item rs s)
+  = flip (,) (AccessItemSyntax False rs) <$> maybe [] (: []) s
 
 toItem
   :: AccessItem
   -> Maybe Item
-toItem (AccessItemConstructor _ rs)
-  = Just (ItemConstructor rs)
-toItem (AccessItemPattern Public rs)
-  = Just (ItemPattern rs)
-toItem (AccessItem Public rs)
-  = Just (Item rs)
+toItem (AccessItemConstructor _ rs _ ss)
+  = Just (ItemConstructor rs ss)
+toItem (AccessItemPattern Public rs s)
+  = Just (ItemPattern rs s)
+toItem (AccessItem _ Public rs s)
+  = Just (Item rs s)
 toItem _
   = Nothing
 
 toItem'
   :: AccessItem
   -> Item
-toItem' (AccessItemConstructor rs1 rs2)
-  = ItemConstructor (rs1 <> rs2)
-toItem' (AccessItemPattern _ rs)
-  = ItemPattern rs
-toItem' (AccessItemDefining _ rs)
-  = Item rs
-toItem' (AccessItem _ rs)
-  = Item rs
+toItem' (AccessItemConstructor rs1 rs2 ss1 ss2)
+  = ItemConstructor (rs1 <> rs2) (ss1 <> ss2)
+toItem' (AccessItemPattern _ rs s)
+  = ItemPattern rs s
+toItem' (AccessItemSyntax _ rs)
+  = Item rs Nothing
+toItem' (AccessItem _ _ rs s)
+  = Item rs s
 
 toModule
   :: (Access, Context)
@@ -671,7 +670,10 @@ fromContext
   -> Context
   -> AccessContext
 fromContext a (Context is ms)
-  = AccessContext (Map.map (fromItem a) is) (Map.map ((,) a) ms) mempty
+  = AccessContext
+    (Map.map (fromItem a) is <> Map.fromList (Map.elems is >>= fromItemSyntax))
+    (Map.map ((,) a) ms)
+    mempty
 
 -- | Convert an 'AccessContext' to 'Context'. Discard private items and imports.
 toContext

@@ -17,11 +17,12 @@ import Agda.Unused.Types.Context
     accessContextImport, accessContextItem, accessContextLookup,
     accessContextLookupDefining, accessContextLookupModule,
     accessContextLookupSpecial, accessContextMatch, accessContextModule,
-    accessContextModule', accessContextUnion, accessItem, accessItemConstructor,
-    contextDelete, contextDeleteModule, contextInsertRange,
-    contextInsertRangeAll, contextInsertRangeModule, contextItem, contextLookup,
-    contextLookupItem, contextLookupModule, contextModule, contextRanges,
-    contextRename, contextRenameModule, fromContext, toContext)
+    accessContextModule', accessContextUnion, contextDelete,
+    contextDeleteModule, contextItem, contextLookup, contextLookupItem,
+    contextLookupModule, contextModule, contextRanges, fromContext, item,
+    itemConstructor, toContext)
+import qualified Agda.Unused.Types.Context
+  as C
 import Agda.Unused.Types.Name
   (Name(..), QName(..), isBuiltin, fromAsName, fromName, fromNameRange,
     fromQName, fromQNameRange, nameIds, qNamePath)
@@ -33,10 +34,11 @@ import Agda.Unused.Utils
   (liftMaybe, mapLeft)
 
 import Agda.Syntax.Common
-  (Arg(..), ImportDirective'(..), ImportedName'(..), Named(..), Renaming'(..),
-    RewriteEqn'(..), Using'(..), namedThing, unArg, whThing)
+  (Arg(..), Fixity'(..), GenPart(..), ImportDirective'(..), ImportedName'(..),
+    Named(..), Ranged(..), Renaming'(..), RewriteEqn'(..), Using'(..),
+    namedThing, unArg, whThing)
 import qualified Agda.Syntax.Common
-  as C
+  as Common
 import Agda.Syntax.Concrete
   (Binder, Binder'(..), BoundName(..), Declaration, DoStmt(..), Expr(..),
     FieldAssignment, FieldAssignment'(..), ImportDirective, ImportedName,
@@ -47,9 +49,9 @@ import Agda.Syntax.Concrete
 import Agda.Syntax.Concrete.Definitions
   (Clause(..), NiceDeclaration(..), niceDeclarations, runNice)
 import Agda.Syntax.Concrete.Fixity
-  (DoWarn(..), fixitiesAndPolarities)
+  (DoWarn(..), Fixities, fixitiesAndPolarities)
 import Agda.Syntax.Concrete.Name
-  (NamePart(..))
+  (NameInScope(..), NamePart(..))
 import qualified Agda.Syntax.Concrete.Name
   as N
 import Agda.Syntax.Parser
@@ -72,6 +74,8 @@ import Data.Bool
   (bool)
 import Data.Map.Strict
   (Map)
+import qualified Data.Map.Strict
+  as Map
 import Data.Maybe
   (catMaybes)
 import qualified Data.Text
@@ -80,6 +84,88 @@ import System.Directory
   (doesFileExist)
 import System.FilePath
   ((</>))
+
+-- ## Contexts
+
+-- Do nothing if in builtin module.
+contextInsertRange
+  :: MonadReader Environment m
+  => Name
+  -> Range
+  -> Context
+  -> m Context
+contextInsertRange n r c
+  = askBuiltin >>= pure . bool (C.contextInsertRange n r c) c
+
+-- Do nothing if in builtin module.
+contextInsertRangeModule
+  :: MonadReader Environment m
+  => Name
+  -> Range
+  -> Context
+  -> m Context
+contextInsertRangeModule n r c
+  = askBuiltin >>= pure . bool (C.contextInsertRangeModule n r c) c
+
+-- Do nothing if in builtin module.
+contextInsertRangeAll
+  :: MonadReader Environment m
+  => Range
+  -> Context
+  -> m Context
+contextInsertRangeAll r c
+  = askBuiltin >>= pure . bool (C.contextInsertRangeAll r c) c
+
+-- Also insert range, unless in builtin module.
+contextRename
+  :: MonadReader Environment m
+  => Name
+  -> Name
+  -> Range
+  -> Context
+  -> m Context
+contextRename n t r c
+  = contextInsertRange n r c
+  >>= pure . C.contextRename n t
+
+-- Also insert range, unless in builtin module.
+contextRenameModule
+  :: MonadReader Environment m
+  => Name
+  -> Name
+  -> Range
+  -> Context
+  -> m Context
+contextRenameModule n t r c
+  = contextInsertRangeModule n r c
+  >>= pure . C.contextRenameModule n t
+
+-- ## Syntax
+
+syntax
+  :: Fixities
+  -> Name
+  -> Maybe Name
+syntax fs (Name ps)
+  = fromFixity <$> Map.lookup (N.Name NoRange InScope ps) fs
+
+fromFixity
+  :: Fixity'
+  -> Name
+fromFixity (Fixity' _ ps _)
+  = Name (fromGenPart <$> ps)
+
+fromGenPart
+  :: GenPart
+  -> NamePart
+fromGenPart (BindHole _ _)
+  = Hole
+fromGenPart (NormalHole _ _)
+  = Hole
+fromGenPart (WildHole _)
+  = Hole
+fromGenPart (IdPart (Ranged _ s))
+  = Id s
 
 -- ## Lists
 
@@ -139,30 +225,32 @@ checkName
   => MonadState State m
   => Bool
   -- ^ Whether to add new names to state.
+  -> Fixities
   -> Access
   -> RangeType
   -> Range
   -> Name
   -> m AccessContext
-checkName _ _ _ NoRange _
+checkName _ _ _ _ NoRange _
   = pure mempty
-checkName _ _ _ _ (Name [Hole])
+checkName _ _ _ _ _ (Name [Hole])
   = pure mempty
-checkName b a t r@(Range _ _) n
+checkName b fs a t r@(Range _ _) n
   = bool (pure ()) (modifyInsert r (RangeInfo t (QName n))) b
-  >> pure (accessContextItem n (accessItem a [r]))
+  >> pure (accessContextItem n a (item [r] (syntax fs n)))
 
 checkName'
   :: MonadReader Environment m
   => MonadState State m
   => Bool
   -- ^ Whether to add new names to state.
+  -> Fixities
   -> Access
   -> RangeType
   -> N.Name
   -> m AccessContext
-checkName' b a t n
-  = maybe (pure mempty) (uncurry (checkName b a t)) (fromNameRange n)
+checkName' b fs a t n
+  = maybe (pure mempty) (uncurry (checkName b fs a t)) (fromNameRange n)
 
 checkNames'
   :: MonadReader Environment m
@@ -172,7 +260,7 @@ checkNames'
   -> [N.Name]
   -> m AccessContext
 checkNames' a
-  = checkSequence (checkName' True a)
+  = checkSequence (checkName' True mempty a)
 
 checkQNameP
   :: MonadError Error m
@@ -220,7 +308,7 @@ checkQName
   -> QName
   -> m AccessContext
 checkQName a t r (QName n)
-  = checkName True a t r n
+  = checkName True mempty a t r n
 checkQName _ _ _ (Qual _ _)
   = pure mempty
 
@@ -323,7 +411,7 @@ checkBinder
   -> Binder
   -> m AccessContext
 checkBinder b c (Binder p (BName n _ _))
-  = checkName' b Public RangeVariable n
+  = checkName' b mempty Public RangeVariable n
   >>= \c' -> checkPatternMay c p
   >>= \c'' -> pure (c' <> c'')
 
@@ -426,7 +514,7 @@ checkPattern _ (WildP _)
 checkPattern _ (AbsurdP _)
   = pure mempty
 checkPattern c (AsP _ n p)
-  = (<>) <$> checkName' True Public RangeVariable n
+  = (<>) <$> checkName' True mempty Public RangeVariable n
     <*> checkPattern c p
 checkPattern c (DotP _ e)
   = checkExpr c e >> pure mempty
@@ -995,7 +1083,7 @@ checkDeclarationsTop
 
 checkDeclarationsWith
   :: MonadError Error m
-  => (AccessContext -> [NiceDeclaration] -> m AccessContext)
+  => (Fixities -> AccessContext -> [NiceDeclaration] -> m AccessContext)
   -> AccessContext
   -> [Declaration]
   -> m AccessContext
@@ -1005,52 +1093,51 @@ checkDeclarationsWith f c ds = do
   (niceDeclsEither, _) 
     <- pure (runNice (niceDeclarations fixities ds))
   niceDecls
-    <- liftEither
-      $ mapLeft ErrorDeclaration
-      $ niceDeclsEither
-  f c niceDecls
+    <- liftEither (mapLeft ErrorDeclaration niceDeclsEither)
+  f fixities c niceDecls
 
 checkNiceDeclaration
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => AccessContext
+  => Fixities
+  -> AccessContext
   -> NiceDeclaration
   -> m AccessContext
 
-checkNiceDeclaration c (Axiom _ a _ _ _ n e)
-  = checkExpr c e >> checkName' True (fromAccess a) RangeDefinition n
-checkNiceDeclaration _ (NiceField r _ _ _ _ _ _)
+checkNiceDeclaration fs c (Axiom _ a _ _ _ n e)
+  = checkExpr c e >> checkName' True fs (fromAccess a) RangeDefinition n
+checkNiceDeclaration _ _ (NiceField r _ _ _ _ _ _)
   = throwError (ErrorInternal (ErrorUnexpected UnexpectedField) r)
-checkNiceDeclaration c (PrimitiveFunction _ a _ n e)
-  = checkExpr c e >> checkName' True (fromAccess a) RangeDefinition n
-checkNiceDeclaration c (NiceMutual _ _ _ _ ds)
-  = checkNiceDeclarations c ds
-checkNiceDeclaration c (NiceModule _ a _ (N.QName n) bs ds)
+checkNiceDeclaration fs c (PrimitiveFunction _ a _ n e)
+  = checkExpr c e >> checkName' True fs (fromAccess a) RangeDefinition n
+checkNiceDeclaration fs c (NiceMutual _ _ _ _ ds)
+  = checkNiceDeclarations fs c ds
+checkNiceDeclaration _ c (NiceModule _ a _ (N.QName n) bs ds)
   = checkNiceModule c (fromAccess a) (fromName n) bs ds
-checkNiceDeclaration _ (NiceModule _ _ _ n@(N.Qual _ _) _ _)
+checkNiceDeclaration _ _ (NiceModule _ _ _ n@(N.Qual _ _) _ _)
   = throwError (ErrorInternal ErrorName (getRange n))
-checkNiceDeclaration _ (NicePragma _ _)
+checkNiceDeclaration _ _ (NicePragma _ _)
   = pure mempty
-checkNiceDeclaration c (NiceRecSig _ a _ _ _ n bs e)
-  = checkNiceSig c a RangeRecord n bs e
-checkNiceDeclaration c (NiceDataSig _ a _ _ _ n bs e)
-  = checkNiceSig c a RangeData n bs e
-checkNiceDeclaration _ (NiceFunClause r _ _ _ _ _ _)
+checkNiceDeclaration fs c (NiceRecSig _ a _ _ _ n bs e)
+  = checkNiceSig fs c a RangeRecord n bs e
+checkNiceDeclaration fs c (NiceDataSig _ a _ _ _ n bs e)
+  = checkNiceSig fs c a RangeData n bs e
+checkNiceDeclaration _ _ (NiceFunClause r _ _ _ _ _ _)
   = throwError (ErrorInternal (ErrorUnexpected UnexpectedNiceFunClause) r)
-checkNiceDeclaration c (FunSig _ a _ _ _ _ _ _ n e)
-  = checkExpr c e >> checkName' True (fromAccess a) RangeDefinition n
-checkNiceDeclaration c (FunDef _ _ _ _ _ _ _ cs)
+checkNiceDeclaration fs c (FunSig _ a _ _ _ _ _ _ n e)
+  = checkExpr c e >> checkName' True fs (fromAccess a) RangeDefinition n
+checkNiceDeclaration _ c (FunDef _ _ _ _ _ _ _ cs)
   = checkClauses c cs >> pure mempty
-checkNiceDeclaration c (NiceGeneralize _ _ _ _ _ e)
+checkNiceDeclaration _ c (NiceGeneralize _ _ _ _ _ e)
   = checkExpr c e >> pure mempty
-checkNiceDeclaration _ (NiceUnquoteDecl r _ _ _ _ _ _ _)
+checkNiceDeclaration _ _ (NiceUnquoteDecl r _ _ _ _ _ _ _)
   = throwError (ErrorUnsupported UnsupportedUnquote r)
-checkNiceDeclaration _ (NiceUnquoteDef r _ _ _ _ _ _)
+checkNiceDeclaration _ _ (NiceUnquoteDef r _ _ _ _ _ _)
   = throwError (ErrorUnsupported UnsupportedUnquote r)
 
-checkNiceDeclaration c
+checkNiceDeclaration _ c
   (NiceModuleMacro r _ (N.NoName _ _)
     (SectionApp _ [] (RawApp _ (Ident n : es))) DoOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
@@ -1058,34 +1145,34 @@ checkNiceDeclaration c
   >>= \c' -> checkExprs c es
   >> checkImportDirective Open r n' c' i
   >>= pure . fromContext (importDirectiveAccess i)
-checkNiceDeclaration _
+checkNiceDeclaration _ _
   (NiceModuleMacro r _ _ _ _ _)
   = throwError (ErrorUnsupported UnsupportedMacro r)
 
-checkNiceDeclaration c (NiceOpen r n i)
+checkNiceDeclaration _ c (NiceOpen r n i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> liftLookup r n' (accessContextLookupModule n' c)
   >>= \c' -> checkImportDirective Open r n' c' i
   >>= pure . fromContext (importDirectiveAccess i)
 
-checkNiceDeclaration _ (NiceImport r n Nothing DontOpen i)
+checkNiceDeclaration _ _ (NiceImport r n Nothing DontOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> checkFile (Just r) n'
   >>= \c' -> checkImportDirective Import r n' c' i
   >>= \c'' -> pure (accessContextImport n' c'')
-checkNiceDeclaration _ (NiceImport r n Nothing DoOpen i)
+checkNiceDeclaration _ _ (NiceImport r n Nothing DoOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> checkFile (Just r) n'
   >>= \c' -> checkImportDirective Import r n' c' i
   >>= \c'' -> pure (accessContextImport n' c'
     <> fromContext (importDirectiveAccess i) c'')
-checkNiceDeclaration _ (NiceImport r n (Just a) DontOpen i)
+checkNiceDeclaration _ _ (NiceImport r n (Just a) DontOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a)) (fromAsName a)
   >>= \a' -> checkFile (Just r) n'
   >>= \c' -> checkImportDirective Import r n' c' i
   >>= \c'' -> pure (accessContextModule a' Public c'')
-checkNiceDeclaration _ (NiceImport r n (Just a) DoOpen i)
+checkNiceDeclaration _ _ (NiceImport r n (Just a) DoOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a)) (fromAsName a)
   >>= \a' -> checkFile (Just r) n'
@@ -1093,25 +1180,25 @@ checkNiceDeclaration _ (NiceImport r n (Just a) DoOpen i)
   >>= \c'' -> pure (accessContextModule a' Public c''
     <> fromContext (importDirectiveAccess i) c'')
 
-checkNiceDeclaration c (NiceDataDef _ _ _ _ _ n bs cs)
+checkNiceDeclaration fs c (NiceDataDef _ _ _ _ _ n bs cs)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> pure (either (const []) id (accessContextLookup (QName n') c))
   >>= \rs -> checkLamBindings False c bs
-  >>= \c' -> checkNiceConstructors rs (accessContextDefine n' c <> c') cs
+  >>= \c' -> checkNiceConstructors fs rs (accessContextDefine n' c <> c') cs
   >>= \c'' -> pure (accessContextModule' n' Public c'' <> c'')
 
-checkNiceDeclaration c (NiceRecDef _ _ _ _ _ n _ _ m bs ds)
+checkNiceDeclaration fs c (NiceRecDef _ _ _ _ _ n _ _ m bs ds)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> pure (either (const []) id (accessContextLookup (QName n') c))
   >>= \rs -> checkLamBindings False c bs
-  >>= \c' -> checkNiceConstructorRecordMay rs (m >>= fromNameRange . fst)
+  >>= \c' -> checkNiceConstructorRecordMay fs rs (m >>= fromNameRange . fst)
   >>= \c'' -> checkDeclarationsRecord n' rs (c <> c') ds
   >>= \c''' -> pure (accessContextModule' n' Public (c'' <> c''') <> c'')
 
-checkNiceDeclaration c (NicePatternSyn _ a n ns p)
+checkNiceDeclaration fs c (NicePatternSyn _ a n ns p)
   = checkNames' Public RangeVariable (unArg <$> ns)
   >>= \c' -> checkPattern (c <> c') p
-  >> checkName' True (fromAccess a) RangePatternSynonym n
+  >> checkName' True fs (fromAccess a) RangePatternSynonym n
 
 checkNiceDeclarationRecord
   :: MonadError Error m
@@ -1121,54 +1208,55 @@ checkNiceDeclarationRecord
   => Name
   -> [Range]
   -- ^ Ranges associated with parent record.
+  -> Fixities
   -> AccessContext
   -> NiceDeclaration
   -> m AccessContext
-checkNiceDeclarationRecord _ rs c d@(Axiom _ _ _ _ _ _ _)
-  = modifyDelete rs >> checkNiceDeclaration c d
-checkNiceDeclarationRecord _ rs c d@(PrimitiveFunction _ _ _ _ _)
-  = modifyDelete rs >> checkNiceDeclaration c d
-checkNiceDeclarationRecord n rs c (NiceMutual _ _ _ _ ds)
-  = checkNiceDeclarationsRecord n rs c ds
-checkNiceDeclarationRecord _ rs c d@(NiceModule _ _ _ _ _ _)
-  = modifyDelete rs >> checkNiceDeclaration c d
-checkNiceDeclarationRecord _ _ c d@(NiceModuleMacro _ _ _ _ _ _)
-  = checkNiceDeclaration c d
-checkNiceDeclarationRecord _ _ c d@(NiceOpen _ _ _)
-  = checkNiceDeclaration c d
-checkNiceDeclarationRecord _ _ c d@(NiceImport _ _ _ _ _)
-  = checkNiceDeclaration c d
-checkNiceDeclarationRecord _ _ c d@(NicePragma _ _)
-  = checkNiceDeclaration c d
-checkNiceDeclarationRecord _ rs c d@(NiceRecSig _ _ _ _ _ _ _ _)
-  = modifyDelete rs >> checkNiceDeclaration c d
-checkNiceDeclarationRecord _ rs c d@(NiceDataSig _ _ _ _ _ _ _ _)
-  = modifyDelete rs >> checkNiceDeclaration c d
-checkNiceDeclarationRecord _ _ c d@(NiceFunClause _ _ _ _ _ _ _)
-  = checkNiceDeclaration c d
-checkNiceDeclarationRecord _ rs c d@(FunSig _ _ _ _ _ _ _ _ _ _)
-  = modifyDelete rs >> checkNiceDeclaration c d
-checkNiceDeclarationRecord _ _ c d@(FunDef _ _ _ _ _ _ _ _)
-  = checkNiceDeclaration c d
-checkNiceDeclarationRecord _ _ c d@(NiceDataDef _ _ _ _ _ _ _ _)
-  = checkNiceDeclaration c d
-checkNiceDeclarationRecord _ _ c d@(NiceRecDef _ _ _ _ _ _ _ _ _ _ _)
-  = checkNiceDeclaration c d
-checkNiceDeclarationRecord _ _ c d@(NicePatternSyn _ _ _ _ _)
-  = checkNiceDeclaration c d
-checkNiceDeclarationRecord _ _ c d@(NiceGeneralize _ _ _ _ _ _)
-  = checkNiceDeclaration c d
-checkNiceDeclarationRecord _ _ c d@(NiceUnquoteDecl _ _ _ _ _ _ _ _)
-  = checkNiceDeclaration c d
-checkNiceDeclarationRecord _ _ c d@(NiceUnquoteDef _ _ _ _ _ _ _)
-  = checkNiceDeclaration c d
+checkNiceDeclarationRecord _ rs fs c d@(Axiom _ _ _ _ _ _ _)
+  = modifyDelete rs >> checkNiceDeclaration fs c d
+checkNiceDeclarationRecord _ rs fs c d@(PrimitiveFunction _ _ _ _ _)
+  = modifyDelete rs >> checkNiceDeclaration fs c d
+checkNiceDeclarationRecord n rs fs c (NiceMutual _ _ _ _ ds)
+  = checkNiceDeclarationsRecord n rs fs c ds
+checkNiceDeclarationRecord _ rs fs c d@(NiceModule _ _ _ _ _ _)
+  = modifyDelete rs >> checkNiceDeclaration fs c d
+checkNiceDeclarationRecord _ _ fs c d@(NiceModuleMacro _ _ _ _ _ _)
+  = checkNiceDeclaration fs c d
+checkNiceDeclarationRecord _ _ fs c d@(NiceOpen _ _ _)
+  = checkNiceDeclaration fs c d
+checkNiceDeclarationRecord _ _ fs c d@(NiceImport _ _ _ _ _)
+  = checkNiceDeclaration fs c d
+checkNiceDeclarationRecord _ _ fs c d@(NicePragma _ _)
+  = checkNiceDeclaration fs c d
+checkNiceDeclarationRecord _ rs fs c d@(NiceRecSig _ _ _ _ _ _ _ _)
+  = modifyDelete rs >> checkNiceDeclaration fs c d
+checkNiceDeclarationRecord _ rs fs c d@(NiceDataSig _ _ _ _ _ _ _ _)
+  = modifyDelete rs >> checkNiceDeclaration fs c d
+checkNiceDeclarationRecord _ _ fs c d@(NiceFunClause _ _ _ _ _ _ _)
+  = checkNiceDeclaration fs c d
+checkNiceDeclarationRecord _ rs fs c d@(FunSig _ _ _ _ _ _ _ _ _ _)
+  = modifyDelete rs >> checkNiceDeclaration fs c d
+checkNiceDeclarationRecord _ _ fs c d@(FunDef _ _ _ _ _ _ _ _)
+  = checkNiceDeclaration fs c d
+checkNiceDeclarationRecord _ _ fs c d@(NiceDataDef _ _ _ _ _ _ _ _)
+  = checkNiceDeclaration fs c d
+checkNiceDeclarationRecord _ _ fs c d@(NiceRecDef _ _ _ _ _ _ _ _ _ _ _)
+  = checkNiceDeclaration fs c d
+checkNiceDeclarationRecord _ _ fs c d@(NicePatternSyn _ _ _ _ _)
+  = checkNiceDeclaration fs c d
+checkNiceDeclarationRecord _ _ fs c d@(NiceGeneralize _ _ _ _ _ _)
+  = checkNiceDeclaration fs c d
+checkNiceDeclarationRecord _ _ fs c d@(NiceUnquoteDecl _ _ _ _ _ _ _ _)
+  = checkNiceDeclaration fs c d
+checkNiceDeclarationRecord _ _ fs c d@(NiceUnquoteDef _ _ _ _ _ _ _)
+  = checkNiceDeclaration fs c d
 
-checkNiceDeclarationRecord n rs c (NiceField _ a _ _ _ n' (Arg _ e))
+checkNiceDeclarationRecord n rs fs c (NiceField _ a _ _ _ n' (Arg _ e))
   = checkExpr (accessContextDefine n c) e
   >> maybe
     (pure mempty)
-    (\n'' -> pure (accessContextItem n''
-      (accessItem (fromAccess a) rs)))
+    (\n'' -> pure (accessContextItem n'' (fromAccess a)
+      (item rs (syntax fs n''))))
     (fromName n')
 
 checkNiceDeclarations
@@ -1176,11 +1264,12 @@ checkNiceDeclarations
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => AccessContext
+  => Fixities
+  -> AccessContext
   -> [NiceDeclaration]
   -> m AccessContext
-checkNiceDeclarations
-  = checkFoldUnion checkNiceDeclaration
+checkNiceDeclarations fs
+  = checkFoldUnion (checkNiceDeclaration fs)
 
 checkNiceDeclarationsRecord
   :: MonadError Error m
@@ -1190,62 +1279,66 @@ checkNiceDeclarationsRecord
   => Name
   -> [Range]
   -- ^ Ranges associated with parent record.
+  -> Fixities
   -> AccessContext
   -> [NiceDeclaration]
   -> m AccessContext
-checkNiceDeclarationsRecord n rs
-  = checkFoldUnion (checkNiceDeclarationRecord n rs)
+checkNiceDeclarationsRecord n rs fs
+  = checkFoldUnion (checkNiceDeclarationRecord n rs fs)
 
 checkNiceDeclarationsTop
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => AccessContext
+  => Fixities
+  -> AccessContext
   -> [NiceDeclaration]
   -> m AccessContext
-checkNiceDeclarationsTop _ []
+checkNiceDeclarationsTop _ _ []
   = pure mempty
-checkNiceDeclarationsTop c (NiceModule _ a _ _ bs ds : _)
+checkNiceDeclarationsTop _ c (NiceModule _ a _ _ bs ds : _)
   = checkNiceModule c (fromAccess a) Nothing bs ds
-checkNiceDeclarationsTop c (d : ds)
-  = checkNiceDeclaration c d >>= \c' -> checkNiceDeclarations (c <> c') ds
+checkNiceDeclarationsTop fs c (d : ds)
+  = checkNiceDeclaration fs c d >>= \c' -> checkNiceDeclarations fs (c <> c') ds
 
 checkNiceSig
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => AccessContext
-  -> C.Access
+  => Fixities
+  -> AccessContext
+  -> Common.Access
   -> RangeType
   -> N.Name
   -> [LamBinding]
   -> Expr
   -> m AccessContext
-checkNiceSig c a t n bs e
+checkNiceSig fs c a t n bs e
   = checkLamBindings False c bs
   >>= \c' -> checkExpr (c <> c') e
-  >> checkName' True (fromAccess a) t n
+  >> checkName' True fs (fromAccess a) t n
 
 checkNiceConstructor
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => [Range]
+  => Fixities
+  -> [Range]
   -- ^ Ranges associated with parent type.
   -> AccessContext
   -> NiceDeclaration
   -> m AccessContext
-checkNiceConstructor rs c (Axiom _ a _ _ _ n e)
+checkNiceConstructor fs rs c (Axiom _ a _ _ _ n e)
   = checkExpr c e
   >> maybe
     (pure mempty)
-    (\n'' -> pure (accessContextItem n''
-      (accessItemConstructor (fromAccess a) rs)))
+    (\n'' -> pure (accessContextItem n'' (fromAccess a)
+      (itemConstructor rs (syntax fs n''))))
     (fromName n)
-checkNiceConstructor _ _ d
+checkNiceConstructor _ _ _ d
   = throwError (ErrorInternal ErrorConstructor (getRange d))
 
 checkNiceConstructors
@@ -1253,37 +1346,40 @@ checkNiceConstructors
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => [Range]
+  => Fixities
+  -> [Range]
   -- ^ Ranges associated with parent type.
   -> AccessContext
   -> [NiceDeclaration]
   -> m AccessContext
-checkNiceConstructors rs
-  = checkSequence (checkNiceConstructor rs)
+checkNiceConstructors fs rs
+  = checkSequence (checkNiceConstructor fs rs)
 
 checkNiceConstructorRecord
   :: MonadReader Environment m
   => MonadState State m
-  => [Range]
+  => Fixities
+  -> [Range]
   -- ^ Ranges associated with record type.
   -> Range
   -> Name
   -> m AccessContext
-checkNiceConstructorRecord rs r n
+checkNiceConstructorRecord fs rs r n
   = modifyInsert r (RangeInfo RangeRecordConstructor (QName n))
-  >> pure (accessContextItem n (accessItemConstructor Public (r : rs)))
+  >> pure (accessContextItem n Public (itemConstructor (r : rs) (syntax fs n)))
 
 checkNiceConstructorRecordMay
   :: MonadReader Environment m
   => MonadState State m
-  => [Range]
+  => Fixities
+  -> [Range]
   -- ^ Ranges associated with record type.
   -> Maybe (Range, Name)
   -> m AccessContext
-checkNiceConstructorRecordMay _ Nothing
+checkNiceConstructorRecordMay _ _ Nothing
   = pure mempty
-checkNiceConstructorRecordMay rs (Just (r, n))
-  = checkNiceConstructorRecord rs r n
+checkNiceConstructorRecordMay fs rs (Just (r, n))
+  = checkNiceConstructorRecord fs rs r n
 
 checkNiceModule
   :: MonadError Error m
@@ -1345,12 +1441,12 @@ checkImportDirective t r n c (ImportDirective _ UseEverything hs rs _)
   = modifyInsert r (RangeInfo (directiveStatement t) n)
   >> modifyHidings c hs
   >>= flip (modifyRenamings t) rs
-  >>= contextInsertRangeAll' r
+  >>= contextInsertRangeAll r
 checkImportDirective t r n c (ImportDirective _ (Using ns) _ rs _)
   = modifyInsert r (RangeInfo (directiveStatement t) n)
   >> checkImportedNames t c ns
   >>= \c' -> checkRenamings t c rs
-  >>= \c'' -> contextInsertRangeAll' r (c' <> c'')
+  >>= \c'' -> contextInsertRangeAll r (c' <> c'')
 
 checkRenaming
   :: MonadReader Environment m
@@ -1399,13 +1495,13 @@ checkImportedNamePair dt c (_, ImportedName n, ImportedName t)
   >>= \(r, t') -> modifyInsert r (RangeInfo (directiveItem dt) (QName t'))
   >> pure (maybe mempty (contextItem t') (contextLookupItem (QName n') c)
     <> maybe mempty (contextModule t') (contextLookupModule (QName n') c))
-  >>= contextInsertRangeAll' r
+  >>= contextInsertRangeAll r
 checkImportedNamePair dt c (_, ImportedModule n, ImportedModule t)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange t)) (fromNameRange t)
   >>= \(r, t') -> modifyInsert r (RangeInfo (directiveItem dt) (QName t'))
   >> pure (maybe mempty (contextModule t') (contextLookupModule (QName n') c))
-  >>= contextInsertRangeAll' r
+  >>= contextInsertRangeAll r
 checkImportedNamePair _ _ (r, _, _)
   = throwError (ErrorInternal ErrorRenaming r)
 
@@ -1452,13 +1548,13 @@ modifyRenaming dt c (Renaming (ImportedName n) (ImportedName t) _ _)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange t)) (fromNameRange t)
   >>= \(r, t') -> modifyInsert r (RangeInfo (directiveItem dt) (QName n'))
-  >> contextRename' n' t' r c
-  >>= contextRenameModule' n' t' r
+  >> contextRename n' t' r c
+  >>= contextRenameModule n' t' r
 modifyRenaming dt c (Renaming (ImportedModule n) (ImportedModule t) _ _)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange t)) (fromNameRange t)
   >>= \(r, t') -> modifyInsert r (RangeInfo (directiveItem dt) (QName n'))
-  >> contextRenameModule' n' t' r c
+  >> contextRenameModule n' t' r c
 modifyRenaming _ _ r
   = throwError (ErrorInternal ErrorRenaming (getRange r))
 
@@ -1498,59 +1594,6 @@ touchModuleWith (Left LookupAmbiguous) r n
   = throwError (ErrorAmbiguous r n)
 touchModuleWith (Right c) _ _
   = modifyDelete (contextRanges c)
-
--- Do nothing if in builtin module.
-contextInsertRange'
-  :: MonadReader Environment m
-  => Name
-  -> Range
-  -> Context
-  -> m Context
-contextInsertRange' n r c
-  = askBuiltin >>= pure . bool (contextInsertRange n r c) c
-
--- Do nothing if in builtin module.
-contextInsertRangeModule'
-  :: MonadReader Environment m
-  => Name
-  -> Range
-  -> Context
-  -> m Context
-contextInsertRangeModule' n r c
-  = askBuiltin >>= pure . bool (contextInsertRangeModule n r c) c
-
--- Do nothing if in builtin module.
-contextInsertRangeAll'
-  :: MonadReader Environment m
-  => Range
-  -> Context
-  -> m Context
-contextInsertRangeAll' r c
-  = askBuiltin >>= pure . bool (contextInsertRangeAll r c) c
-
--- Rename item in context, and insert range unless in builtin module.
-contextRename'
-  :: MonadReader Environment m
-  => Name
-  -> Name
-  -> Range
-  -> Context
-  -> m Context
-contextRename' n t r c
-  = contextInsertRange' n r c
-  >>= pure . contextRename n t
-
--- Rename module in context, and insert range unless in builtin module.
-contextRenameModule'
-  :: MonadReader Environment m
-  => Name
-  -> Name
-  -> Range
-  -> Context
-  -> m Context
-contextRenameModule' n t r c
-  = contextInsertRangeModule' n r c
-  >>= pure . contextRenameModule n t
 
 importDirectiveAccess
   :: ImportDirective

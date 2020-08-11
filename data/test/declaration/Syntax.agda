@@ -14,38 +14,36 @@ data S
 syntax S A₁ (λ x → A₂)
   = x ∈ A₁ × A₂
 
--- module M where
+module M where
 
---   data S'
---     (A₁ : Set)
---     (A₂ : A₁ → Set)
---     : Set
---     where
+  data S'
+    (A₁ : Set)
+    (A₂ : A₁ → Set)
+    : Set
+    where
 
---     _,'_
---       : (x₁ : A₁)
---       → A₂ x₁
---       → S' A₁ A₂
+    _,'_
+      : (x₁ : A₁)
+      → A₂ x₁
+      → S' A₁ A₂
 
---   syntax S' A₁ (λ x → A₂)
---     = x ∈' A₁ ×' A₂
+  syntax S' A₁ (λ x → A₂)
+    = x ∈' A₁ ×' A₂
 
--- open M
---   using (S'; _,'_)
+open M
+  using (S')
 
-p1
-  : {A₁ : Set}
-  → {A₂ : A₁ → Set}
-  → x₁ ∈ A₁ × A₂ x₁
-  → A₁
-p1
-  = ?
-  
--- p1'
---   : {A₁ : Set}
---   → {A₂ : A₁ → Set}
---   → x₁ ∈' A₁ ×' A₂ x₁
---   → A₁
--- p1' (x₁ ,' _)
---   = x₁
+postulate
+
+  p1
+    : {A₁ : Set}
+    → {A₂ : A₁ → Set}
+    → x₁ ∈ A₁ × A₂ x₁
+    → A₁
+    
+  p1'
+    : {A₁ : Set}
+    → {A₂ : A₁ → Set}
+    → x₁ ∈' A₁ ×' A₂ x₁
+    → A₁
   

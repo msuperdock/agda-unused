@@ -1,8 +1,23 @@
+{- |
+Module: Agda.Unused.Utils
+
+Utility functions for 'Maybe', 'Either', and 'Map' types.
+-}
 module Agda.Unused.Utils
-  ( liftMaybe
-  , mapDeletes
+
+  ( -- * Maybe
+
+    liftMaybe
+
+    -- * Either
+
   , mapLeft
+
+    -- * Map
+
+  , mapDeletes
   , mapUpdateKey
+
   ) where
 
 import Control.Monad.Except
@@ -14,6 +29,7 @@ import qualified Data.Map.Strict
 
 -- ## Maybe
 
+-- | Lift a 'Maybe' type to an error monad by throwing a fixed error.
 liftMaybe
   :: MonadError e m
   => e
@@ -26,6 +42,7 @@ liftMaybe _ (Just x)
 
 -- ## Either
 
+-- | Map the left component of an 'Either' type.
 mapLeft
   :: (e -> f)
   -> Either e a
@@ -37,6 +54,7 @@ mapLeft _ (Right x)
 
 -- ## Map
 
+-- | Delete a list of keys from a map.
 mapDeletes
   :: Ord k
   => [k]
@@ -45,6 +63,10 @@ mapDeletes
 mapDeletes ks xs
   = foldr Map.delete xs ks
 
+-- | Modify a key of a map.
+--
+-- - If the source key is not present, do nothing.
+-- - If the target key is already present, overwrite it.
 mapUpdateKey
   :: Ord k
   => k

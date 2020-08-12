@@ -73,9 +73,15 @@ printError
   :: Error
   -> Text
 printError (ErrorFile p)
-  = "error: .agda-roots file not found " <> P.parens (T.pack p)
+  = "error: .agda-roots file not found " <> parens (T.pack p)
 printError (ErrorParse t)
   = t
+
+parens
+  :: Text
+  -> Text
+parens t
+  = "(" <> t <> ")"
 
 -- ## Check
 

@@ -1,3 +1,8 @@
+{- |
+Module: Agda.Unused.Types.Config
+
+Parsing function for configuration file, which contains a list of roots.
+-}
 module Agda.Unused.Config
   ( parseConfig
   ) where
@@ -102,11 +107,12 @@ parseRoot
     <*  parseSpace
     <*> many parseRootName
 
+-- | Parse configuration, producing either an error message or a list of roots.
 parseConfig
   :: Text
   -> Either Text [Root]
 parseConfig
   = mapLeft T.pack
   . mapLeft errorBundlePretty
-  . parse (many parseRoot) ".roots"
+  . parse (many parseRoot) ".agda-roots"
 

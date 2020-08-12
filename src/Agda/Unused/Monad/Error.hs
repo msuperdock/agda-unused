@@ -1,12 +1,23 @@
 {-# LANGUAGE UndecidableInstances #-}
 
+{- |
+Module: Agda.Unused.Monad.Error
+
+An error monad for determining unused code.
+-}
 module Agda.Unused.Monad.Error
-  ( Error(..)
+
+  ( -- * Definitions
+    
+    Error(..)
   , InternalError(..)
-  , LookupError(..)
   , UnexpectedError(..)
   , UnsupportedError(..)
+
+    -- * Lift
+
   , liftLookup
+
   ) where
 
 import Agda.Unused.Types.Context
@@ -27,50 +38,61 @@ import Control.Monad.Except
 
 -- ## Definitions
 
+-- | An error encountered while checking for unused code.
 data Error where
 
+  -- | Ambiguous lookup.
   ErrorAmbiguous
     :: !Range
     -> !QName
     -> Error
 
+  -- | Cyclic module dependency.
   ErrorCyclic
     :: !(Maybe Range)
     -> !QName
     -> Error
 
+  -- | Agda declaration exception.
   ErrorDeclaration
     :: !DeclarationException
     -> Error
 
+  -- | File not found.
   ErrorFile
     :: !(Maybe Range)
     -> !QName
     -> !FilePath
     -> Error
 
+  -- | Agda fixity exception.
   ErrorFixity
     :: !(Maybe Range)
     -> Error
 
+  -- | Internal error; should be reported.
   ErrorInternal
     :: !InternalError
     -> !Range
     -> Error
 
+  -- | Module not found in open statement.
   ErrorOpen
     :: !Range
     -> !QName
     -> Error
 
+  -- | Agda parse error.
   ErrorParse
     :: !ParseError
     -> Error
   
+  -- | Agda polarity error.
   ErrorPolarity
     :: !(Maybe Range)
     -> Error
 
+  -- | Unsupported language feature.
   ErrorUnsupported
     :: !UnsupportedError
     -> !Range
@@ -78,23 +100,31 @@ data Error where
 
   deriving Show
 
+-- | An internal error, indicating a bug in our code. This type of error should
+-- be reported by filing an issue.
 data InternalError where
 
+  -- | Unexpected declaration type for constructor.
   ErrorConstructor
     :: InternalError
 
+  -- | Unexpected underscore as name.
   ErrorName
     :: InternalError
 
+  -- | Unexpected name-module mismatch in renaming statement.
   ErrorRenaming
     :: InternalError
 
+  -- | Unexpected data type constructor.
   ErrorUnexpected
     :: !UnexpectedError
     -> InternalError
 
   deriving Show
 
+-- | An error indicating that a constructor for a data type is used where it
+-- should not be used.
 data UnexpectedError where
 
   UnexpectedAbsurd
@@ -129,11 +159,14 @@ data UnexpectedError where
 
   deriving Show
 
+-- | An error indicating that an unsupported language was found.
 data UnsupportedError where
 
+  -- | Certain module macros.
   UnsupportedMacro
     :: UnsupportedError
 
+  -- | Unquoting primitives.
   UnsupportedUnquote
     :: UnsupportedError
 
@@ -161,6 +194,7 @@ instance (Monad m, MonadError Error m) => MonadFixityError m where
 
 -- ## Lookup
 
+-- | Lift a lookup result to our error monad.
 liftLookup
   :: MonadError Error m
   => Range

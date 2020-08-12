@@ -1,12 +1,27 @@
+{- |
+Module: Agda.Unused.Monad.State
+
+A state monad for determining unused code.
+-}
 module Agda.Unused.Monad.State
-  ( ModuleState(..)
+
+  ( -- * Definitions
+
+    ModuleState(..)
   , State(..)
+
+    -- * Interface
+
+  , stateEmpty
+  , stateBlock
+  , stateCheck
+  , stateLookup
+
+    -- * Modify
+
   , modifyDelete
   , modifyInsert
-  , stateCheck
-  , stateBlock
-  , stateEmpty
-  , stateLookup
+
   ) where
 
 import Agda.Unused.Monad.Reader
@@ -31,6 +46,10 @@ import Data.Map.Strict
 import qualified Data.Map.Strict
   as Map
 
+-- | Cache the results of checking modules. This allows us to:
+-- 
+-- - Avoid duplicate computations.
+-- - Handle cyclic module dependencies without nontermination.
 data ModuleState where
 
   Blocked
@@ -42,14 +61,18 @@ data ModuleState where
 
   deriving Show
 
+-- | The current computation state.
 data State
   = State
   { stateUnused
     :: !(Map Range RangeInfo)
+    -- ^ Ranges for each unused item.
   , stateModules
     :: !(Map QName ModuleState)
+    -- ^ State for module dependencies.
   } deriving Show
 
+-- | Construct an empty state.
 stateEmpty
   :: State
 stateEmpty
@@ -72,6 +95,7 @@ stateDelete
 stateDelete rs (State rs' ms)
   = State (mapDeletes rs rs') ms
 
+-- | Lookup the state of a module.
 stateLookup
   :: QName
   -> State
@@ -79,6 +103,7 @@ stateLookup
 stateLookup m (State _ ms)
   = Map.lookup m ms
 
+-- | Mark that we are beginning to check a module.
 stateBlock
   :: QName
   -> State
@@ -86,6 +111,7 @@ stateBlock
 stateBlock m (State rs ms)
   = State rs (Map.insert m Blocked ms)
 
+-- | Record the results of checking a module.
 stateCheck
   :: QName
   -> Context
@@ -94,6 +120,7 @@ stateCheck
 stateCheck m c (State rs ms)
   = State rs (Map.insert m (Checked c) ms)
 
+-- | Record a new unused item.
 modifyInsert
   :: MonadReader Environment m
   => MonadState State m
@@ -104,6 +131,7 @@ modifyInsert r i
   = askBuiltin
   >>= bool (modify (stateInsert r i)) (pure ())
 
+-- | Mark a list of items as used.
 modifyDelete
   :: MonadReader Environment m
   => MonadState State m

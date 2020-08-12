@@ -1,9 +1,11 @@
+{- |
+Module: Agda.Unused.Print
+
+Printing functions for unused items and errors.
+-}
 module Agda.Unused.Print
-  ( indent
-  , parens
-  , printError
+  ( printError
   , printUnused
-  , quote
   ) where
 
 import Agda.Unused.Monad.Error
@@ -87,6 +89,7 @@ printMessage t1 t2
 
 -- ## Errors
 
+-- | Print an error.
 printError
   :: Error
   -> Text
@@ -172,6 +175,7 @@ printUnsupportedError UnsupportedUnquote
 
 -- ## Unused
 
+-- | Print a collection of unused ranges.
 printUnused
   :: Map Range RangeInfo
   -> Text

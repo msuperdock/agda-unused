@@ -1,5 +1,5 @@
 {- |
-Module : Agda.Unused.Types.Context
+Module: Agda.Unused.Types.Context
 
 Definitions and interface for the 'Context' and 'AccessContext' types, which
 represent namespaces of definitions.
@@ -115,12 +115,12 @@ data Item where
 
   deriving Show
 
--- | Like 'Item', but with some additional data:
+-- Like 'Item', but with some additional data:
 --
 -- - Whether the name is public or private.
 -- - Whether the name is currently being defined.
 --
--- Since constructors may be overloaded, a constructor 'AccessItem' may
+-- Since constructors may be overloaded, a constructor AccessItem may
 -- represent multiple constructors, some public and some private.
 data AccessItem where
 

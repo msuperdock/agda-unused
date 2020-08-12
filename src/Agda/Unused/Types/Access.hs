@@ -1,12 +1,28 @@
+{- |
+Module: Agda.Unused.Types.Access
+
+Access modifiers indicating whether an item is public or private.
+-}
 module Agda.Unused.Types.Access
-  ( Access(..)
+
+  ( -- * Definition
+    
+    Access(..)
+
+    -- * Interface
+
   , access
+   
+    -- * Conversion
+
   , fromAccess
+
   ) where
 
 import qualified Agda.Syntax.Common
   as C
 
+-- | An access modifier.
 data Access where
 
   Private
@@ -17,6 +33,7 @@ data Access where
 
   deriving Show
 
+-- | Elimination rule for 'Access'.
 access
   :: a
   -> a
@@ -27,6 +44,7 @@ access x _ Private
 access _ y Public
   = y
 
+-- | Conversion from Agda access type.
 fromAccess
   :: C.Access
   -> Access

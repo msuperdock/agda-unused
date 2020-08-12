@@ -1,3 +1,8 @@
+{- |
+Module: Agda.Unused
+
+Check an Agda project for unused code.
+-}
 module Agda.Unused
   ( checkUnused
   ) where
@@ -1712,9 +1717,12 @@ checkRoots
 
 -- ## Main
 
+-- | Check an Agda file and its dependencies for unused code.
 checkUnused
   :: FilePath
+  -- ^ The project root path.
   -> [Root]
+  -- ^ A list of public entry points for the project.
   -> IO (Either Error (Map Range RangeInfo))
 checkUnused p
   = runExceptT

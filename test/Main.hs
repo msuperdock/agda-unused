@@ -201,8 +201,6 @@ testDeclaration
     (testCheckDeclaration "Syntax" ["p1", "p1'"])
   >> it "checks pattern synonyms (PatternSyn)"
     (testCheckDeclaration "PatternSyn" ["q", "f", "g"])
-  >> it "checks mutual blocks (Mutual)"
-    (testCheckDeclaration "Mutual" ["f", "g"])
   >> it "checks postulates (Postulate)"
     (testCheckDeclaration "Postulate" ["g", "h"])
 

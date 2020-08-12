@@ -7,9 +7,6 @@ data ⊤
   tt
     : ⊤
 
-pattern p
-  = tt
-
 data D
   (A : Set)
   : Set
@@ -19,6 +16,12 @@ data D
     : A
     → A
     → D A
+
+pattern p
+  = tt
+
+pattern q
+  = tt
 
 pattern _,_ x y
   = d x y

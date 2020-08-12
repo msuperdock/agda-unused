@@ -57,6 +57,7 @@ module Agda.Unused.Types.Context
     -- * Construction
 
   , item
+  , itemPattern
   , itemConstructor
   , contextItem
   , contextModule
@@ -536,8 +537,16 @@ item
   :: [Range]
   -> Maybe Name
   -> Item
-item rs s
-  = Item rs s
+item
+  = Item
+
+-- | Construct an 'Item' representing a pattern synonym.
+itemPattern
+  :: [Range]
+  -> Maybe Name
+  -> Item
+itemPattern
+  = ItemPattern
 
 -- | Construct an 'Item' representing a constructor.
 itemConstructor

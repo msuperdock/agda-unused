@@ -20,7 +20,7 @@ import Agda.Unused.Types.Context
     accessContextModule', accessContextUnion, contextDelete,
     contextDeleteModule, contextItem, contextLookup, contextLookupItem,
     contextLookupModule, contextModule, contextRanges, fromContext, item,
-    itemConstructor, toContext)
+    itemConstructor, itemPattern, toContext)
 import qualified Agda.Unused.Types.Context
   as C
 import Agda.Unused.Types.Name
@@ -225,42 +225,50 @@ checkName
   => MonadState State m
   => Bool
   -- ^ Whether to add new names to state.
+  -> Bool
+  -- ^ Whether to treat names as pattern synonyms.
   -> Fixities
   -> Access
   -> RangeType
   -> Range
   -> Name
   -> m AccessContext
-checkName _ _ _ _ NoRange _
+checkName _ _ _ _ _ NoRange _
   = pure mempty
-checkName _ _ _ _ _ (Name [Hole])
+checkName _ _ _ _ _ _ (Name [Hole])
   = pure mempty
-checkName b fs a t r@(Range _ _) n
+checkName b p fs a t r@(Range _ _) n
   = bool (pure ()) (modifyInsert r (RangeInfo t (QName n))) b
-  >> pure (accessContextItem n a (item [r] (syntax fs n)))
+  >> pure (accessContextItem n a (bool item itemPattern p [r] (syntax fs n)))
 
 checkName'
   :: MonadReader Environment m
   => MonadState State m
   => Bool
   -- ^ Whether to add new names to state.
+  -> Bool
+  -- ^ Whether to treat names as pattern synonyms.
   -> Fixities
   -> Access
   -> RangeType
   -> N.Name
   -> m AccessContext
-checkName' b fs a t n
-  = maybe (pure mempty) (uncurry (checkName b fs a t)) (fromNameRange n)
+checkName' b p fs a t n
+  = maybe (pure mempty) (uncurry (checkName b p fs a t)) (fromNameRange n)
 
 checkNames'
   :: MonadReader Environment m
   => MonadState State m
-  => Access
+  => Bool
+  -- ^ Whether to add new names to state.
+  -> Bool
+  -- ^ Whether to treat names as pattern synonyms.
+  -> Access
   -> RangeType
   -> [N.Name]
   -> m AccessContext
-checkNames' a
-  = checkSequence (checkName' True mempty a)
+checkNames' b p a
+  = checkSequence (checkName' b p mempty a)
 
 checkQNameP
   :: MonadError Error m
@@ -308,7 +316,7 @@ checkQName
   -> QName
   -> m AccessContext
 checkQName a t r (QName n)
-  = checkName True mempty a t r n
+  = checkName True False mempty a t r n
 checkQName _ _ _ (Qual _ _)
   = pure mempty
 
@@ -411,7 +419,7 @@ checkBinder
   -> Binder
   -> m AccessContext
 checkBinder b c (Binder p (BName n _ _))
-  = checkName' b mempty Public RangeVariable n
+  = checkName' b False mempty Public RangeVariable n
   >>= \c' -> checkPatternMay c p
   >>= \c'' -> pure (c' <> c'')
 
@@ -514,7 +522,7 @@ checkPattern _ (WildP _)
 checkPattern _ (AbsurdP _)
   = pure mempty
 checkPattern c (AsP _ n p)
-  = (<>) <$> checkName' True mempty Public RangeVariable n
+  = (<>) <$> checkName' True False mempty Public RangeVariable n
     <*> checkPattern c p
 checkPattern c (DotP _ e)
   = checkExpr c e >> pure mempty
@@ -1107,11 +1115,11 @@ checkNiceDeclaration
   -> m AccessContext
 
 checkNiceDeclaration fs c (Axiom _ a _ _ _ n e)
-  = checkExpr c e >> checkName' True fs (fromAccess a) RangeDefinition n
+  = checkExpr c e >> checkName' True False fs (fromAccess a) RangeDefinition n
 checkNiceDeclaration _ _ (NiceField r _ _ _ _ _ _)
   = throwError (ErrorInternal (ErrorUnexpected UnexpectedField) r)
 checkNiceDeclaration fs c (PrimitiveFunction _ a _ n e)
-  = checkExpr c e >> checkName' True fs (fromAccess a) RangeDefinition n
+  = checkExpr c e >> checkName' True False fs (fromAccess a) RangeDefinition n
 checkNiceDeclaration fs c (NiceMutual _ _ _ _ ds)
   = checkNiceDeclarations fs c ds
 checkNiceDeclaration _ c (NiceModule _ a _ (N.QName n) bs ds)
@@ -1127,7 +1135,7 @@ checkNiceDeclaration fs c (NiceDataSig _ a _ _ _ n bs e)
 checkNiceDeclaration _ _ (NiceFunClause r _ _ _ _ _ _)
   = throwError (ErrorInternal (ErrorUnexpected UnexpectedNiceFunClause) r)
 checkNiceDeclaration fs c (FunSig _ a _ _ _ _ _ _ n e)
-  = checkExpr c e >> checkName' True fs (fromAccess a) RangeDefinition n
+  = checkExpr c e >> checkName' True False fs (fromAccess a) RangeDefinition n
 checkNiceDeclaration _ c (FunDef _ _ _ _ _ _ _ cs)
   = checkClauses c cs >> pure mempty
 checkNiceDeclaration _ c (NiceGeneralize _ _ _ _ _ e)
@@ -1196,9 +1204,9 @@ checkNiceDeclaration fs c (NiceRecDef _ _ _ _ _ n _ _ m bs ds)
   >>= \c''' -> pure (accessContextModule' n' Public (c'' <> c''') <> c'')
 
 checkNiceDeclaration fs c (NicePatternSyn _ a n ns p)
-  = checkNames' Public RangeVariable (unArg <$> ns)
+  = checkNames' False False Public RangeVariable (unArg <$> ns)
   >>= \c' -> checkPattern (c <> c') p
-  >> checkName' True fs (fromAccess a) RangePatternSynonym n
+  >> checkName' True True fs (fromAccess a) RangePatternSynonym n
 
 checkNiceDeclarationRecord
   :: MonadError Error m
@@ -1300,7 +1308,8 @@ checkNiceDeclarationsTop _ _ []
 checkNiceDeclarationsTop _ c (NiceModule _ a _ _ bs ds : _)
   = checkNiceModule c (fromAccess a) Nothing bs ds
 checkNiceDeclarationsTop fs c (d : ds)
-  = checkNiceDeclaration fs c d >>= \c' -> checkNiceDeclarations fs (c <> c') ds
+  = checkNiceDeclaration fs c d
+  >>= \c' -> checkNiceDeclarations fs (c <> c') ds
 
 checkNiceSig
   :: MonadError Error m
@@ -1318,7 +1327,7 @@ checkNiceSig
 checkNiceSig fs c a t n bs e
   = checkLamBindings False c bs
   >>= \c' -> checkExpr (c <> c') e
-  >> checkName' True fs (fromAccess a) t n
+  >> checkName' True False fs (fromAccess a) t n
 
 checkNiceConstructor
   :: MonadError Error m

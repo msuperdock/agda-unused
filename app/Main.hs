@@ -31,7 +31,7 @@ import Options.Applicative
 import System.Directory
   (doesFileExist, getCurrentDirectory, makeAbsolute)
 import System.FilePath
-  ((</>), splitDirectories, stripExtension)
+  ((</>), splitDirectories, stripExtension, takeDirectory)
 
 -- ## Options
 
@@ -170,12 +170,44 @@ name
 name p
   = Name [Id p]
 
+-- ## Root
+
+-- Search recursively upwards for project root directory.
+getRootDirectory
+  :: IO FilePath
+getRootDirectory
+  = getCurrentDirectory >>= \p -> getRootDirectoryFrom p p
+
+getRootDirectoryFrom
+  :: FilePath
+  -- ^ Default directory.
+  -> FilePath
+  -- ^ Starting directory.
+  -> IO FilePath
+getRootDirectoryFrom d p
+  = doesFileExist (p </> ".agda-roots") >>= getRootDirectoryWith d p
+
+getRootDirectoryWith
+  :: FilePath
+  -- ^ Default directory.
+  -> FilePath
+  -- ^ Starting directory.
+  -> Bool
+  -- ^ Whether the starting directory contains an .agda-roots file.
+  -> IO FilePath
+getRootDirectoryWith _ p True
+  = pure p
+getRootDirectoryWith d p False | takeDirectory p == p
+  = pure d
+getRootDirectoryWith d p False
+  = getRootDirectoryFrom d (takeDirectory p)
+
 -- ## Main
 
 main
   :: IO ()
 main
-  = getCurrentDirectory
+  = getRootDirectory
   >>= execParser . options
   >>= check
 

@@ -11,7 +11,7 @@ import Agda.Unused.Monad.Error
   (Error(..), InternalError(..), UnexpectedError(..), UnsupportedError(..),
     liftLookup)
 import Agda.Unused.Monad.Reader
-  (Environment(..), askBuiltin, askRoot, localBuiltin)
+  (Environment(..), askRoot, askSkip, localSkip)
 import Agda.Unused.Monad.State
   (ModuleState(..), State(..), modifyDelete, modifyInsert, stateBlock,
     stateCheck, stateEmpty, stateLookup)
@@ -100,7 +100,7 @@ contextInsertRange
   -> Context
   -> m Context
 contextInsertRange n r c
-  = askBuiltin >>= pure . bool (C.contextInsertRange n r c) c
+  = askSkip >>= pure . bool (C.contextInsertRange n r c) c
 
 -- Do nothing if in builtin module.
 contextInsertRangeModule
@@ -110,7 +110,7 @@ contextInsertRangeModule
   -> Context
   -> m Context
 contextInsertRangeModule n r c
-  = askBuiltin >>= pure . bool (C.contextInsertRangeModule n r c) c
+  = askSkip >>= pure . bool (C.contextInsertRangeModule n r c) c
 
 -- Do nothing if in builtin module.
 contextInsertRangeAll
@@ -119,7 +119,7 @@ contextInsertRangeAll
   -> Context
   -> m Context
 contextInsertRangeAll r c
-  = askBuiltin >>= pure . bool (C.contextInsertRangeAll r c) c
+  = askSkip >>= pure . bool (C.contextInsertRangeAll r c) c
 
 -- Also insert range, unless in builtin module.
 contextRename
@@ -229,8 +229,6 @@ checkName
   :: MonadReader Environment m
   => MonadState State m
   => Bool
-  -- ^ Whether to add new names to state.
-  -> Bool
   -- ^ Whether to treat names as pattern synonyms.
   -> Fixities
   -> Access
@@ -238,42 +236,38 @@ checkName
   -> Range
   -> Name
   -> m AccessContext
-checkName _ _ _ _ _ NoRange _
+checkName _ _ _ _ NoRange _
   = pure mempty
-checkName _ _ _ _ _ _ (Name [Hole])
+checkName _ _ _ _ _ (Name [Hole])
   = pure mempty
-checkName b p fs a t r@(Range _ _) n
-  = bool (pure ()) (modifyInsert r (RangeInfo t (QName n))) b
+checkName p fs a t r@(Range _ _) n
+  = modifyInsert r (RangeInfo t (QName n))
   >> pure (accessContextItem n a (bool item itemPattern p [r] (syntax fs n)))
 
 checkName'
   :: MonadReader Environment m
   => MonadState State m
   => Bool
-  -- ^ Whether to add new names to state.
-  -> Bool
   -- ^ Whether to treat names as pattern synonyms.
   -> Fixities
   -> Access
   -> RangeType
   -> N.Name
   -> m AccessContext
-checkName' b p fs a t n
-  = maybe (pure mempty) (uncurry (checkName b p fs a t)) (fromNameRange n)
+checkName' b fs a t n
+  = maybe (pure mempty) (uncurry (checkName b fs a t)) (fromNameRange n)
 
 checkNames'
   :: MonadReader Environment m
   => MonadState State m
   => Bool
-  -- ^ Whether to add new names to state.
-  -> Bool
   -- ^ Whether to treat names as pattern synonyms.
   -> Access
   -> RangeType
   -> [N.Name]
   -> m AccessContext
-checkNames' b p a
-  = checkSequence (checkName' b p mempty a)
+checkNames' b a
+  = checkSequence (checkName' b mempty a)
 
 checkQNameP
   :: MonadError Error m
@@ -321,7 +315,7 @@ checkQName
   -> QName
   -> m AccessContext
 checkQName a t r (QName n)
-  = checkName True False mempty a t r n
+  = checkName False mempty a t r n
 checkQName _ _ _ (Qual _ _)
   = pure mempty
 
@@ -332,8 +326,7 @@ touchName
   -> Name
   -> m ()
 touchName c n
-  = askBuiltin
-  >>= \b -> touchNameWith b (accessContextLookupDefining (QName n) c)
+  = askSkip >>= \b -> touchNameWith b (accessContextLookupDefining (QName n) c)
 
 touchNameWith
   :: MonadReader Environment m
@@ -365,8 +358,7 @@ touchQName
   -> QName
   -> m ()
 touchQName c r n
-  = askBuiltin
-  >>= \b -> touchQNameWith b (accessContextLookupDefining n c) r n
+  = askSkip >>= \b -> touchQNameWith b (accessContextLookupDefining n c) r n
 
 touchQNameWith
   :: MonadError Error m
@@ -419,12 +411,12 @@ checkBinder
   => MonadState State m
   => MonadIO m
   => Bool
-  -- ^ Whether to add new names to state.
+  -- ^ Whether to check bound names.
   -> AccessContext
   -> Binder
   -> m AccessContext
 checkBinder b c (Binder p (BName n _ _))
-  = checkName' b False mempty Public RangeVariable n
+  = bool localSkip id b (checkName' False mempty Public RangeVariable n)
   >>= \c' -> checkPatternMay c p
   >>= \c'' -> pure (c' <> c'')
 
@@ -434,7 +426,7 @@ checkBinders
   => MonadState State m
   => MonadIO m
   => Bool
-  -- ^ Whether to add new names to state.
+  -- ^ Whether to check bound names.
   -> AccessContext
   -> [Binder]
   -> m AccessContext
@@ -447,7 +439,7 @@ checkLamBinding
   => MonadState State m
   => MonadIO m
   => Bool
-  -- ^ Whether to add new names to state.
+  -- ^ Whether to check bound names.
   -> AccessContext
   -> LamBinding
   -> m AccessContext
@@ -462,7 +454,7 @@ checkLamBindings
   => MonadState State m
   => MonadIO m
   => Bool
-  -- ^ Whether to add new names to state.
+  -- ^ Whether to check bound names.
   -> AccessContext
   -> [LamBinding]
   -> m AccessContext
@@ -475,7 +467,7 @@ checkTypedBinding
   => MonadState State m
   => MonadIO m
   => Bool
-  -- ^ Whether to add new names to state.
+  -- ^ Whether to check bound names.
   -> AccessContext
   -> TypedBinding
   -> m AccessContext
@@ -489,11 +481,13 @@ checkTypedBindings
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => AccessContext
+  => Bool
+  -- ^ Whether to check bound names.
+  -> AccessContext
   -> [TypedBinding]
   -> m AccessContext
-checkTypedBindings
-  = checkFold (checkTypedBinding True)
+checkTypedBindings b
+  = checkFold (checkTypedBinding b)
 
 -- ## Patterns
  
@@ -527,7 +521,7 @@ checkPattern _ (WildP _)
 checkPattern _ (AbsurdP _)
   = pure mempty
 checkPattern c (AsP _ n p)
-  = (<>) <$> checkName' True False mempty Public RangeVariable n
+  = (<>) <$> checkName' False mempty Public RangeVariable n
     <*> checkPattern c p
 checkPattern c (DotP _ e)
   = checkExpr c e >> pure mempty
@@ -647,7 +641,7 @@ checkExpr c (ExtendedLam _ ls)
 checkExpr c (Fun _ (Arg _ e) e')
   = checkExpr c e >> checkExpr c e'
 checkExpr c (Pi bs e)
-  = checkTypedBindings c bs >>= \c' -> checkExpr (c <> c') e
+  = checkTypedBindings True c bs >>= \c' -> checkExpr (c <> c') e
 checkExpr _ (Set _)
   = pure ()
 checkExpr _ (Prop _)
@@ -1120,11 +1114,11 @@ checkNiceDeclaration
   -> m AccessContext
 
 checkNiceDeclaration fs c (Axiom _ a _ _ _ n e)
-  = checkExpr c e >> checkName' True False fs (fromAccess a) RangeDefinition n
+  = checkExpr c e >> checkName' False fs (fromAccess a) RangeDefinition n
 checkNiceDeclaration _ _ (NiceField r _ _ _ _ _ _)
   = throwError (ErrorInternal (ErrorUnexpected UnexpectedField) r)
 checkNiceDeclaration fs c (PrimitiveFunction _ a _ n e)
-  = checkExpr c e >> checkName' True False fs (fromAccess a) RangeDefinition n
+  = checkExpr c e >> checkName' False fs (fromAccess a) RangeDefinition n
 checkNiceDeclaration fs c (NiceMutual _ _ _ _ ds)
   = checkNiceDeclarations fs c ds
 checkNiceDeclaration _ c (NiceModule _ a _ (N.QName n) bs ds)
@@ -1140,7 +1134,7 @@ checkNiceDeclaration fs c (NiceDataSig _ a _ _ _ n bs e)
 checkNiceDeclaration _ _ (NiceFunClause r _ _ _ _ _ _)
   = throwError (ErrorInternal (ErrorUnexpected UnexpectedNiceFunClause) r)
 checkNiceDeclaration fs c (FunSig _ a _ _ _ _ _ _ n e)
-  = checkExpr c e >> checkName' True False fs (fromAccess a) RangeDefinition n
+  = checkExpr c e >> checkName' False fs (fromAccess a) RangeDefinition n
 checkNiceDeclaration _ c (FunDef _ _ _ _ _ _ _ cs)
   = checkClauses c cs >> pure mempty
 checkNiceDeclaration _ c (NiceGeneralize _ _ _ _ _ e)
@@ -1209,9 +1203,9 @@ checkNiceDeclaration fs c (NiceRecDef _ _ _ _ _ n _ _ m bs ds)
   >>= \c''' -> pure (accessContextModule' n' Public (c'' <> c''') <> c'')
 
 checkNiceDeclaration fs c (NicePatternSyn _ a n ns p)
-  = checkNames' False False Public RangeVariable (unArg <$> ns)
+  = localSkip (checkNames' False Public RangeVariable (unArg <$> ns))
   >>= \c' -> checkPattern (c <> c') p
-  >> checkName' True True fs (fromAccess a) RangePatternSynonym n
+  >> checkName' True fs (fromAccess a) RangePatternSynonym n
 
 checkNiceDeclarationRecord
   :: MonadError Error m
@@ -1332,7 +1326,7 @@ checkNiceSig
 checkNiceSig fs c a t n bs e
   = checkLamBindings False c bs
   >>= \c' -> checkExpr (c <> c') e
-  >> checkName' True False fs (fromAccess a) t n
+  >> checkName' False fs (fromAccess a) t n
 
 checkNiceConstructor
   :: MonadError Error m
@@ -1408,7 +1402,7 @@ checkNiceModule
   -> [Declaration]
   -> m AccessContext
 checkNiceModule c a n bs ds
-  = checkTypedBindings c bs
+  = checkTypedBindings True c bs
   >>= \c' -> checkDeclarations (c <> c') ds
   >>= pure . maybe (fromContext a) (flip accessContextModule a) n . toContext
 
@@ -1653,7 +1647,7 @@ checkFileWith
   -> QName
   -> m Context
 checkFileWith Nothing r n | isBuiltin n
-  = localBuiltin (checkFilePath r n ("data" </> qNamePath n))
+  = localSkip (checkFilePath r n ("data" </> qNamePath n))
 checkFileWith Nothing r n
   = askRoot >>= \p -> checkFilePath r n (p </> qNamePath n)
 

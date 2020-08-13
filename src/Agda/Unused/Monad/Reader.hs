@@ -11,12 +11,12 @@ module Agda.Unused.Monad.Reader
 
     -- * Ask
 
-  , askBuiltin
+  , askSkip
   , askRoot
 
     -- * Local
 
-  , localBuiltin
+  , localSkip
 
   ) where
 
@@ -26,9 +26,9 @@ import Control.Monad.Reader
 -- | An environment type for use in a reader monad.
 data Environment
   = Environment
-  { environmentBuiltin
+  { environmentSkip
     :: !Bool
-    -- ^ Whether we are in a builtin module.
+    -- ^ Whether to skip checking names.
   , environmentRoot
     :: !FilePath
     -- ^ The project root path.
@@ -41,18 +41,18 @@ askRoot
 askRoot
   = environmentRoot <$> ask
 
--- | Ask whether we are in a builtin module.
-askBuiltin
+-- | Ask whether to skip checking names.
+askSkip
   :: MonadReader Environment m
   => m Bool
-askBuiltin
-  = environmentBuiltin <$> ask
+askSkip
+  = environmentSkip <$> ask
 
--- | Perform a computation within a builtin module.
-localBuiltin
+-- | Skip checking names in a local computation.
+localSkip
   :: MonadReader Environment m
   => m a
   -> m a
-localBuiltin
-  = local (\e -> e {environmentBuiltin = True})
+localSkip
+  = local (\e -> e {environmentSkip = True})
 

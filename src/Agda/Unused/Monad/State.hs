@@ -25,7 +25,7 @@ module Agda.Unused.Monad.State
   ) where
 
 import Agda.Unused.Monad.Reader
-  (Environment, askBuiltin)
+  (Environment, askSkip)
 import Agda.Unused.Types.Context
   (Context)
 import Agda.Unused.Types.Name
@@ -128,8 +128,7 @@ modifyInsert
   -> RangeInfo
   -> m ()
 modifyInsert r i
-  = askBuiltin
-  >>= bool (modify (stateInsert r i)) (pure ())
+  = askSkip >>= bool (modify (stateInsert r i)) (pure ())
 
 -- | Mark a list of items as used.
 modifyDelete
@@ -138,6 +137,5 @@ modifyDelete
   => [Range]
   -> m ()
 modifyDelete rs
-  = askBuiltin
-  >>= bool (modify (stateDelete rs)) (pure ())
+  = askSkip >>= bool (modify (stateDelete rs)) (pure ())
 

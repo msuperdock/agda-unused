@@ -203,6 +203,8 @@ testDeclaration
     (testCheckDeclaration "PatternSyn" ["q", "f", "g"])
   >> it "checks postulates (Postulate)"
     (testCheckDeclaration "Postulate" ["g", "h"])
+  >> it "checks open statements (Open)"
+    (testCheckDeclaration "Open" ["N", "x", "y"])
 
 -- ## Main
 

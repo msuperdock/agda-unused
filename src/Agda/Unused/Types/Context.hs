@@ -97,6 +97,7 @@ import Data.Maybe
 -- - Whether the name is a constructor, pattern synonym, or ordinary definition.
 -- - A list of ranges associated with the name, which includes the site of the
 -- original definition, as well as any relevant @import@ or @open@ statements.
+-- - Alternative syntax for the name, if any.
 data Item where
 
   ItemConstructor
@@ -662,7 +663,7 @@ fromItemSyntax (Item rs s)
 toItem
   :: AccessItem
   -> Maybe Item
-toItem (AccessItemConstructor _ rs _ ss)
+toItem (AccessItemConstructor _ rs@(_ : _) _ ss)
   = Just (ItemConstructor rs ss)
 toItem (AccessItemPattern Public rs s)
   = Just (ItemPattern rs s)

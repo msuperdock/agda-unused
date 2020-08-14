@@ -120,6 +120,16 @@ dependencies, ignoring all publicly accessible definitions.
 
 ## Limitations
 
+### Unsupported language features
+
+We currently do not support code containing:
+
+- [unquoting declarations](https://agda.readthedocs.io/en/v2.6.1/language/reflection.html#id3)
+- [module assignments](https://agda.readthedocs.io/en/v2.6.1/language/module-system.html#parameterised-modules)
+- [external libraries](https://agda.readthedocs.io/en/v2.6.1/tools/package-system.html) (other than Agda's built-in libraries)
+
+`agda-unused` will produce an error if your code uses these language features.
+
 ### Mutual recursion
 
 For ordinary recursion, we consider an identifier unused if it only appears in
@@ -150,14 +160,4 @@ After checking this code, `g` and `h` are both considered used.
 
 Fixing this issue will require a graph of dependencies for each block of
 mutually recursive code.
-
-### Unsupported language features
-
-We currently do not support code containing:
-
-- [unquoting declarations](https://agda.readthedocs.io/en/v2.6.1/language/reflection.html#id3)
-- [module assignments](https://agda.readthedocs.io/en/v2.6.1/language/module-system.html#parameterised-modules)
-- [external libraries](https://agda.readthedocs.io/en/v2.6.1/tools/package-system.html) (other than Agda's built-in libraries)
-
-`agda-unused` will produce an error if your code uses these language features.
 

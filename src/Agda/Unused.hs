@@ -174,13 +174,15 @@ syntax
   -> Name
   -> Maybe Name
 syntax fs (Name ps)
-  = fromFixity <$> Map.lookup (N.Name NoRange InScope ps) fs
+  = Map.lookup (N.Name NoRange InScope ps) fs >>= fromFixity
 
 fromFixity
   :: Fixity'
-  -> Name
-fromFixity (Fixity' _ ps _)
-  = Name (fromGenPart <$> ps)
+  -> Maybe Name
+fromFixity (Fixity' _ [] _)
+  = Nothing
+fromFixity (Fixity' _ ps@(_ : _) _)
+  = Just (Name (fromGenPart <$> ps))
 
 fromGenPart
   :: GenPart

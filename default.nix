@@ -3,7 +3,7 @@
 }:
 mkDerivation {
   pname = "agda-unused";
-  version = "0.1.0.0";
+  version = "0.1.0";
   src = ./.;
   isLibrary = true;
   isExecutable = true;
@@ -15,5 +15,6 @@ mkDerivation {
     base directory filepath mtl optparse-applicative text
   ];
   testHaskellDepends = [ base containers filepath hspec ];
+  description = "Check for unused code in an Agda project";
   license = stdenv.lib.licenses.mit;
 }

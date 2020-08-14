@@ -3,17 +3,31 @@ cabal-version: 3.0
 name:
   agda-unused
 version:
-  0.1.0.0
+  0.1.0
+build-type:
+  Simple
 license:
   MIT
 license-file:
   LICENSE
-extra-source-files:
-  README.md
+maintainer:
+  Matt Superdock <msuperdock@gmail.com>
+synopsis:
+  Check for unused code in an Agda project.
+description:
+  A command-line tool to check for unused code in an Agda project.
+category:
+  Dependent types
 data-files:
   data/**/*.agda
-build-type:
-  Simple
+extra-source-files:
+  README.md
+
+source-repository head
+  type:
+    git
+  location:
+    https://github.com/msuperdock/agda-unused.git
 
 library
   hs-source-dirs:
@@ -32,6 +46,8 @@ library
     Agda.Unused.Types.Root
     Agda.Unused.Utils
   other-modules:
+    Paths_agda_unused
+  autogen-modules:
     Paths_agda_unused
   build-depends:
     base >= 4.13.0 && < 4.14,

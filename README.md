@@ -96,6 +96,7 @@ The project root directory is determined as follows:
 - If the `--root` option is given, its value is the project root.
 - If the `--local` option is given, the nearest ancestor with an `.agda-roots`
   file is the project root, if any.
+- If the current directory has an `.agda-roots` file, it is the project root.
 - Otherwise, the nearest ancestor of the current directory with an `.agda-roots`
   file is the project root, if any.
 - Otherwise, we take the current directory as the project root.

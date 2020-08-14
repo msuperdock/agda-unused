@@ -91,10 +91,14 @@ Available options:
   -l,--local FILE          Path of file to check locally
 ```
 
-If the `--root` option is not given, `agda-unused` searches for an `.agda-roots`
-file in the current directory and its parents. If an `.agda-roots` file is
-found, its location is considered the project root directory; otherwise, the
-current directory is considered the project root directory.
+The project root directory is determined as follows:
+
+- If the `--root` option is given, its value is the project root.
+- If the `--local` option is given, the nearest containing directory with an
+  `.agda-roots` file is the project root, if any.
+- Otherwise, the nearest containing directory of the current directory with an
+  `.agda-roots` file is the project root, if any.
+- Otherwise, we take the current directory as the project root.
 
 ## Approach
 

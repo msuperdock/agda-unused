@@ -27,7 +27,7 @@ import qualified Data.Text.IO
   as I
 import Options.Applicative
   (InfoMod, Parser, ParserInfo, execParser, fullDesc, header, help, helper,
-    info, long, metavar, optional, progDesc, short, strOption, value)
+    info, long, metavar, optional, progDesc, short, strOption)
 import System.Directory
   (doesFileExist, getCurrentDirectory, makeAbsolute)
 import System.FilePath
@@ -38,25 +38,22 @@ import System.FilePath
 data Options
   = Options
   { optionsRoot
-    :: !FilePath
+    :: !(Maybe FilePath)
     -- ^ The project root path.
   , optionsFile
-    :: Maybe FilePath
+    :: !(Maybe FilePath)
     -- ^ A file path to check locally.
   } deriving Show
 
 optionsParser
-  :: FilePath
-  -- ^ The default file path.
-  -> Parser Options
-optionsParser p
+  :: Parser Options
+optionsParser
   = Options
-  <$> (strOption
+  <$> optional (strOption
     $ short 'r'
     <> long "root"
     <> metavar "ROOT"
-    <> help "Path of project root directory"
-    <> value p)
+    <> help "Path of project root directory")
   <*> optional (strOption
     $ short 'l'
     <> long "local"
@@ -71,11 +68,9 @@ optionsInfo
   <> header "agda-unused - check for unused code in an Agda project"
 
 options
-  :: FilePath
-  -- ^ The default file path.
-  -> ParserInfo Options
-options p
-  = info (helper <*> optionsParser p) optionsInfo
+  :: ParserInfo Options
+options
+  = info (helper <*> optionsParser) optionsInfo
 
 -- ## Errors
 
@@ -124,9 +119,11 @@ check'
   => Options
   -> m ()
 
-check' (Options p Nothing) = do
+check' o@(Options _ Nothing) = do
+  rootPath
+    <- liftIO (getRootDirectory o)
   configPath
-    <- pure (p </> ".agda-roots")
+    <- pure (rootPath </> ".agda-roots")
   exists
     <- liftIO (doesFileExist configPath)
   _
@@ -136,20 +133,22 @@ check' (Options p Nothing) = do
   roots
     <- liftEither (mapLeft ErrorParse (parseConfig contents))
   checkResult
-    <- liftIO (checkUnused p roots)
+    <- liftIO (checkUnused rootPath roots)
   _
     <- liftIO (I.putStr (either P.printError P.printUnused checkResult))
   pure ()
 
-check' (Options p (Just f)) = do
+check' o@(Options _ (Just f)) = do
   rootPath
-    <- liftIO (makeAbsolute p >>= pure . splitDirectories)
+    <- liftIO (getRootDirectory o)
+  rootPath'
+    <- liftIO (makeAbsolute rootPath >>= pure . splitDirectories)
   filePath
     <- liftIO (makeAbsolute f >>= pure . splitDirectories)
   localModule
-    <- liftMaybe (ErrorLocal f) (stripPrefix rootPath filePath >>= pathModule)
+    <- liftMaybe (ErrorLocal f) (stripPrefix rootPath' filePath >>= pathModule)
   checkResult
-    <- liftIO (checkUnusedLocal p localModule)
+    <- liftIO (checkUnusedLocal rootPath localModule)
   _
     <- liftIO (I.putStr (either P.printError P.printUnused checkResult))
   pure ()
@@ -172,12 +171,17 @@ name p
 
 -- ## Root
 
--- Search recursively upwards for project root directory.
 getRootDirectory
-  :: IO FilePath
-getRootDirectory
+  :: Options
+  -> IO FilePath
+getRootDirectory (Options (Just p) _)
+  = pure p
+getRootDirectory (Options Nothing Nothing)
   = getCurrentDirectory >>= \p -> getRootDirectoryFrom p p
+getRootDirectory (Options Nothing (Just f))
+  = getRootDirectoryFrom (takeDirectory f) (takeDirectory f)
 
+-- Search recursively upwards for project root directory.
 getRootDirectoryFrom
   :: FilePath
   -- ^ Default directory.
@@ -207,7 +211,6 @@ getRootDirectoryWith d p False
 main
   :: IO ()
 main
-  = getRootDirectory
-  >>= execParser . options
+  = execParser options
   >>= check
 

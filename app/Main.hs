@@ -61,7 +61,7 @@ optionsParser p
     $ short 'l'
     <> long "local"
     <> metavar "FILE"
-    <> help "File to check locally")
+    <> help "Path of file to check locally")
 
 optionsInfo
   :: InfoMod a

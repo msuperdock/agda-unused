@@ -8,10 +8,12 @@ license:
   MIT
 license-file:
   LICENSE
-build-type:
-  Simple
+extra-source-files:
+  README.md
 data-files:
   data/**/*.agda
+build-type:
+  Simple
 
 library
   hs-source-dirs:

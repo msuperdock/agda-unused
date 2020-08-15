@@ -89,6 +89,7 @@ Available options:
   -h,--help                Show this help text
   -r,--root ROOT           Path of project root directory
   -l,--local FILE          Path of file to check locally
+  -j,--json                Format output as JSON 
 ```
 
 The project root directory is determined as follows:
@@ -118,6 +119,15 @@ identifiers are unused on the first run.
 For a global check, we check each file appearing in `.agda-roots` and its
 dependencies. For a local check, we check just the given file and its
 dependencies, ignoring all publicly accessible definitions.
+
+## JSON
+
+If the `--json` switch is given, the output is a JSON object with two fields:
+
+- `type`: One of `"none"`, `"unused"`, `"error"`.
+- `message`: A string, the same as the usual output of `agda-unused`.
+
+The `"none"` type indicates that there is no unused code.
 
 ## Limitations
 

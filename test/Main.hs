@@ -1,18 +1,18 @@
 module Main where
 
 import Agda.Unused
+  (Unused(..))
+import Agda.Unused.Check
   (checkUnused)
 import Agda.Unused.Monad.Error
   (Error)
 import Agda.Unused.Types.Name
   (Name(..), NamePart(..), QName(..))
 import Agda.Unused.Types.Range
-  (Range, RangeInfo, rangeName)
+  (rangeName)
 import Agda.Unused.Types.Root
   (Root(..))
 
-import Data.Map.Strict
-  (Map)
 import qualified Data.Map.Strict
   as Map
 import Data.Set
@@ -137,12 +137,12 @@ testCheckNamesExpression
 
 testUnused
   :: Set QName
-  -> Either Error (Map Range RangeInfo)
+  -> Either Error Unused
   -> Expectation
 testUnused _ (Left _)
   = expectationFailure ""
-testUnused us (Right rs)
-  = Set.fromList (rangeName <$> Map.elems rs) `shouldBe` us
+testUnused ns (Right (Unused rs))
+  = Set.fromList (rangeName <$> Map.elems rs) `shouldBe` ns
 
 -- ## Tests
 

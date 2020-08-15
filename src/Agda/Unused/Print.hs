@@ -8,6 +8,8 @@ module Agda.Unused.Print
   , printUnused
   ) where
 
+import Agda.Unused
+  (Unused(..), unusedNull)
 import Agda.Unused.Monad.Error
   (Error(..), InternalError(..), UnexpectedError(..), UnsupportedError(..))
 import Agda.Unused.Types.Name
@@ -17,8 +19,6 @@ import Agda.Unused.Types.Range
 
 import Agda.Utils.Pretty
   (prettyShow)
-import Data.Map.Strict
-  (Map)
 import qualified Data.Map.Strict
   as Map
 import Data.Text
@@ -85,6 +85,13 @@ printMessage
   -> Text
   -> Text
 printMessage t1 t2
+  = T.unlines [t1, t2]
+
+printMessageIndent
+  :: Text
+  -> Text
+  -> Text
+printMessageIndent t1 t2
   = T.unlines [t1, indent t2]
 
 -- ## Errors
@@ -96,33 +103,33 @@ printError
 
 printError (ErrorAmbiguous r n)
   = printMessage (printRange r)
-  $ "error: ambiguous name " <> parens (printQName n)
+  $ "Error: Ambiguous name " <> parens (printQName n) <> "."
 printError (ErrorCyclic r n)
   = printMessage (maybe (printQName n) printRange r)
-  $ "error: cyclic module dependency " <> parens (printQName n)
+  $ "Error: Cyclic module dependency " <> parens (printQName n) <> "."
 printError (ErrorFile r n p)
   = printMessage (maybe (printQName n) printRange r)
-  $ "error: file not found " <> parens (T.pack p)
+  $ "Error: File not found " <> parens (T.pack p) <> "."
 printError (ErrorFixity (Just r))
   = printMessage (printRange r)
-  $ "error: multiple fixity declarations"
+  $ "Error: Multiple fixity declarations."
 printError (ErrorInternal e r)
   = printMessage (printRange r)
-  $ "internal error: " <> printInternalError e
+  $ "Internal error: " <> printInternalError e
 printError (ErrorOpen r n)
   = printMessage (printRange r)
-  $ "error: module not found " <> parens (printQName n)
+  $ "Error: Module not found " <> parens (printQName n) <> "."
 printError (ErrorPolarity (Just r))
   = printMessage (printRange r)
-  $ "error: multiple polarity declarations"
+  $ "Error: Multiple polarity declarations."
 printError (ErrorUnsupported e r)
   = printMessage (printRange r)
-  $ "error: " <> printUnsupportedError e <> " not supported"
+  $ "Error: " <> printUnsupportedError e <> " not supported."
 
 printError (ErrorFixity Nothing)
-  = "error: multiple fixity declarations"
+  = "Error: Multiple fixity declarations."
 printError (ErrorPolarity Nothing)
-  = "error: multiple polarity declarations"
+  = "Error: Multiple polarity declarations."
 
 printError (ErrorDeclaration e)
   = printRange (getRange e) <> "\n" <> T.pack (prettyShow e)
@@ -133,13 +140,13 @@ printInternalError
   :: InternalError
   -> Text
 printInternalError ErrorConstructor
-  = "invalid data constructor"
+  = "Invalid data constructor."
 printInternalError ErrorName
-  = "invalid name"
+  = "Invalid name."
 printInternalError ErrorRenaming
-  = "invalid renaming directive"
+  = "Invalid renaming directive."
 printInternalError (ErrorUnexpected e)
-  = "unexpected constructor " <> quote (printUnexpectedError e)
+  = "Unexpected constructor " <> quote (printUnexpectedError e) <> "."
 
 printUnexpectedError
   :: UnexpectedError
@@ -169,19 +176,19 @@ printUnsupportedError
   :: UnsupportedError
   -> Text
 printUnsupportedError UnsupportedMacro
-  = "module assignment"
+  = "Module assignments"
 printUnsupportedError UnsupportedUnquote
-  = "unquoting primitives"
+  = "Unquoting primitives"
 
 -- ## Unused
 
 -- | Print a collection of unused ranges.
 printUnused
-  :: Map Range RangeInfo
+  :: Unused
   -> Text
-printUnused rs | Map.null rs
-  = T.unlines ["no unused code"]
-printUnused rs
+printUnused u | unusedNull u
+  = T.unlines ["No unused code."]
+printUnused (Unused rs)
   = Map.foldMapWithKey printRangeInfoWith rs
 
 printRangeInfoWith
@@ -189,7 +196,7 @@ printRangeInfoWith
   -> RangeInfo
   -> Text
 printRangeInfoWith r i
-  = printMessage (printRange r) (printRangeInfo i)
+  = printMessageIndent (printRange r) (printRangeInfo i)
 
 printRangeInfo
   :: RangeInfo

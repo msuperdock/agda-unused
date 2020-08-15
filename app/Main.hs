@@ -1,9 +1,13 @@
 module Main where
 
 import Agda.Unused
+  (Unused, unusedNull)
+import Agda.Unused.Check
   (checkUnused, checkUnusedLocal)
 import Agda.Unused.Config
   (parseConfig)
+import qualified Agda.Unused.Monad.Error
+  as E
 import qualified Agda.Unused.Print
   as P
 import Agda.Unused.Types.Name
@@ -15,6 +19,10 @@ import Control.Monad.Except
   (MonadError, liftEither, runExceptT, throwError)
 import Control.Monad.IO.Class
   (MonadIO, liftIO)
+import Data.Aeson
+  (Value(..), (.=), object)
+import Data.Aeson.Text
+  (encodeToLazyText)
 import Data.Bool
   (bool)
 import Data.List
@@ -25,9 +33,11 @@ import qualified Data.Text
   as T
 import qualified Data.Text.IO
   as I
+import Data.Text.Lazy
+  (toStrict)
 import Options.Applicative
   (InfoMod, Parser, ParserInfo, execParser, fullDesc, header, help, helper,
-    info, long, metavar, optional, progDesc, short, strOption)
+    info, long, metavar, optional, progDesc, short, strOption, switch)
 import System.Directory
   (doesFileExist, getCurrentDirectory, makeAbsolute)
 import System.FilePath
@@ -43,6 +53,9 @@ data Options
   , optionsFile
     :: !(Maybe FilePath)
     -- ^ A file path to check locally.
+  , optionsJSON
+    :: !Bool
+    -- ^ Whether to output JSON.
   } deriving Show
 
 optionsParser
@@ -59,6 +72,10 @@ optionsParser
     <> long "local"
     <> metavar "FILE"
     <> help "Path of file to check locally")
+  <*> (switch
+    $ short 'j'
+    <> long "json"
+    <> help "Format output as JSON")
 
 optionsInfo
   :: InfoMod a
@@ -88,30 +105,14 @@ data Error where
     :: !Text
     -> Error
 
-printError
-  :: Error
-  -> Text
-printError (ErrorFile p)
-  = "error: .agda-roots file not found " <> parens (T.pack p)
-printError (ErrorLocal l)
-  = "error: invalid local path " <> parens (T.pack l)
-printError (ErrorParse t)
-  = t
-
-parens
-  :: Text
-  -> Text
-parens t
-  = "(" <> t <> ")"
-
 -- ## Check
 
 check
   :: Options
   -> IO ()
-check p
-  = runExceptT (check' p)
-  >>= either (I.putStr . printError) (const (pure ()))
+check o@(Options _ _ j)
+  = runExceptT (check' o)
+  >>= either (I.putStr . printErrorWith j) (const (pure ()))
 
 check'
   :: MonadError Error m
@@ -119,7 +120,7 @@ check'
   => Options
   -> m ()
 
-check' o@(Options _ Nothing) = do
+check' o@(Options _ Nothing j) = do
   rootPath
     <- liftIO (getRootDirectory o)
   configPath
@@ -135,10 +136,10 @@ check' o@(Options _ Nothing) = do
   checkResult
     <- liftIO (checkUnused rootPath roots)
   _
-    <- liftIO (I.putStr (either P.printError P.printUnused checkResult))
+    <- liftIO (I.putStr (printResultWith j checkResult))
   pure ()
 
-check' o@(Options _ (Just f)) = do
+check' o@(Options _ (Just f) j) = do
   rootPath
     <- liftIO (getRootDirectory o)
   rootPath'
@@ -150,7 +151,7 @@ check' o@(Options _ (Just f)) = do
   checkResult
     <- liftIO (checkUnusedLocal rootPath localModule)
   _
-    <- liftIO (I.putStr (either P.printError P.printUnused checkResult))
+    <- liftIO (I.putStr (printResultWith j checkResult))
   pure ()
 
 pathModule
@@ -169,16 +170,87 @@ name
 name p
   = Name [Id p]
 
+-- ## Print
+
+printErrorWith
+  :: Bool
+  -- ^ Whether to output JSON.
+  -> Error
+  -> Text
+printErrorWith False
+  = printError
+printErrorWith True
+  = toStrict . encodeToLazyText . printErrorJSON
+
+printError
+  :: Error
+  -> Text
+printError (ErrorFile p)
+  = "Error: .agda-roots file not found " <> parens (T.pack p) <> "."
+printError (ErrorLocal l)
+  = "Error: Invalid local path " <> parens (T.pack l) <> "."
+printError (ErrorParse t)
+  = t
+
+printResultWith
+  :: Bool
+  -- ^ Whether to output JSON.
+  -> Either E.Error Unused
+  -> Text
+printResultWith False
+  = printResult
+printResultWith True
+  = toStrict . encodeToLazyText . printResultJSON
+
+printResult
+  :: Either E.Error Unused
+  -> Text
+printResult
+  = either P.printError P.printUnused
+
+parens
+  :: Text
+  -> Text
+parens t
+  = "(" <> t <> ")"
+
+-- ## JSON
+
+printErrorJSON
+  :: Error
+  -> Value
+printErrorJSON e
+  = encodeMessage "error" (printError e)
+
+printResultJSON
+  :: Either E.Error Unused
+  -> Value
+printResultJSON (Left e)
+  = encodeMessage "error" (P.printError e)
+printResultJSON (Right u) | unusedNull u
+  = encodeMessage "none" (P.printUnused u)
+printResultJSON (Right u)
+  = encodeMessage "unused" (P.printUnused u)
+
+encodeMessage
+  :: Text
+  -- ^ Type of message.
+  -> Text
+  -- ^ Contents of message.
+  -> Value
+encodeMessage t m
+  = object ["type" .= t, "message" .= m]
+
 -- ## Root
 
 getRootDirectory
   :: Options
   -> IO FilePath
-getRootDirectory (Options (Just p) _)
+getRootDirectory (Options (Just p) _ _)
   = pure p
-getRootDirectory (Options Nothing Nothing)
+getRootDirectory (Options Nothing Nothing _)
   = getCurrentDirectory >>= \p -> getRootDirectoryFrom p p
-getRootDirectory (Options Nothing (Just f))
+getRootDirectory (Options Nothing (Just f) _)
   = getRootDirectoryFrom (takeDirectory f) (takeDirectory f)
 
 -- Search recursively upwards for project root directory.

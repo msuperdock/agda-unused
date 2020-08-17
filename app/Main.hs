@@ -143,9 +143,9 @@ check' o@(Options _ (Just f) j) = do
   rootPath
     <- liftIO (getRootDirectory o)
   rootPath'
-    <- liftIO (makeAbsolute rootPath >>= pure . splitDirectories)
+    <- pure (splitDirectories rootPath)
   filePath
-    <- liftIO (makeAbsolute f >>= pure . splitDirectories)
+    <- liftIO (makeAbsolute f >>= \f' -> pure (splitDirectories f'))
   localModule
     <- liftMaybe (ErrorLocal f) (stripPrefix rootPath' filePath >>= pathModule)
   checkResult
@@ -246,12 +246,14 @@ encodeMessage t m
 getRootDirectory
   :: Options
   -> IO FilePath
-getRootDirectory (Options (Just p) _ _)
-  = pure p
 getRootDirectory (Options Nothing Nothing _)
-  = getCurrentDirectory >>= \p -> getRootDirectoryFrom p p
-getRootDirectory (Options Nothing (Just f) _)
-  = getRootDirectoryFrom (takeDirectory f) (takeDirectory f)
+  = getCurrentDirectory
+  >>= \p -> getRootDirectoryFrom p p
+getRootDirectory (Options Nothing (Just p) _)
+  = makeAbsolute p
+  >>= \p' -> getRootDirectoryFrom (takeDirectory p') (takeDirectory p')
+getRootDirectory (Options (Just p) _ _)
+  = makeAbsolute p
 
 -- Search recursively upwards for project root directory.
 getRootDirectoryFrom

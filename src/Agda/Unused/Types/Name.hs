@@ -28,12 +28,16 @@ module Agda.Unused.Types.Name
     -- * Paths
 
   , qNamePath
+  , pathQName
 
     -- * Match
 
   , matchOperators
 
   ) where
+
+import Agda.Unused.Utils
+  (stripSuffix)
 
 import Agda.Syntax.Concrete
   (AsName, AsName'(..))
@@ -45,10 +49,12 @@ import Agda.Syntax.Position
   (Range)
 import Data.List
   (isSubsequenceOf)
+import qualified Data.List
+  as List
 import Data.Maybe
   (mapMaybe)
 import System.FilePath
-  ((</>), (<.>))
+  ((</>), (<.>), splitDirectories)
 
 -- ## Definitions
 
@@ -186,6 +192,33 @@ qNamePath (QName n)
   = namePath n <.> "agda"
 qNamePath (Qual n ns)
   = namePath n </> qNamePath ns
+
+-- | Convert a 'FilePath' to a module name.
+pathQName
+  :: FilePath
+  -- ^ The project root directory.
+  -> FilePath
+  -- ^ The path to the module.
+  -> Maybe QName
+pathQName p p'
+  = List.stripPrefix (splitDirectories p) (splitDirectories p')
+  >>= pathQNameRelative
+
+pathQNameRelative
+  :: [String]
+  -> Maybe QName
+pathQNameRelative []
+  = Nothing
+pathQNameRelative [n]
+  = QName <$> pathName n
+pathQNameRelative (n : ns@(_ : _))
+  = Qual (Name [Id n]) <$> pathQNameRelative ns
+
+pathName
+  :: String
+  -> Maybe Name
+pathName n
+  = Name . (: []) . Id <$> stripSuffix ".agda" n
 
 -- ## Match
 

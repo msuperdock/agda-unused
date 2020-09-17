@@ -1,7 +1,5 @@
 module Main where
 
-import Agda.Unused
-  (Unused, unusedNull)
 import Agda.Unused.Check
   (checkUnused, checkUnusedLocal)
 import Agda.Unused.Config
@@ -136,7 +134,7 @@ check' o@(Options _ Nothing j) = do
   checkResult
     <- liftIO (checkUnused rootPath roots)
   _
-    <- liftIO (I.putStr (printResultWith j checkResult))
+    <- liftIO (I.putStr (printResult j P.printUnused checkResult))
   pure ()
 
 check' o@(Options _ (Just f) j) = do
@@ -151,7 +149,7 @@ check' o@(Options _ (Just f) j) = do
   checkResult
     <- liftIO (checkUnusedLocal rootPath localModule)
   _
-    <- liftIO (I.putStr (printResultWith j checkResult))
+    <- liftIO (I.putStr (printResult j P.printUnusedItems checkResult))
   pure ()
 
 pathModule
@@ -192,21 +190,16 @@ printError (ErrorLocal l)
 printError (ErrorParse t)
   = t
 
-printResultWith
+printResult
   :: Bool
   -- ^ Whether to output JSON.
-  -> Either E.Error Unused
+  -> (a -> Maybe Text)
+  -> Either E.Error a
   -> Text
-printResultWith False
-  = printResult
-printResultWith True
-  = toStrict . encodeToLazyText . printResultJSON
-
-printResult
-  :: Either E.Error Unused
-  -> Text
-printResult
-  = either P.printError P.printUnused
+printResult False p
+  = either P.printError (maybe P.printNothing id . p)
+printResult True p
+  = toStrict . encodeToLazyText . printResultJSON p
 
 parens
   :: Text
@@ -223,14 +216,13 @@ printErrorJSON e
   = encodeMessage "error" (printError e)
 
 printResultJSON
-  :: Either E.Error Unused
+  :: (a -> Maybe Text)
+  -> Either E.Error a
   -> Value
-printResultJSON (Left e)
+printResultJSON _ (Left e)
   = encodeMessage "error" (P.printError e)
-printResultJSON (Right u) | unusedNull u
-  = encodeMessage "none" (P.printUnused u)
-printResultJSON (Right u)
-  = encodeMessage "unused" (P.printUnused u)
+printResultJSON p (Right u)
+  = maybe (encodeMessage "none" P.printNothing) (encodeMessage "unused") (p u)
 
 encodeMessage
   :: Text

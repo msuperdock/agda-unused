@@ -108,6 +108,10 @@ data InternalError where
   ErrorConstructor
     :: InternalError
 
+  -- | Unexpected arguments to SectionApp constructor.
+  ErrorMacro
+    :: InternalError
+
   -- | Unexpected underscore as name.
   ErrorName
     :: InternalError
@@ -162,7 +166,7 @@ data UnexpectedError where
 -- | An error indicating that an unsupported language was found.
 data UnsupportedError where
 
-  -- | Certain module macros.
+  -- | Record module instance applications.
   UnsupportedMacro
     :: UnsupportedError
 

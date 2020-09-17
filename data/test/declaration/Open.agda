@@ -21,8 +21,15 @@ module N where
 open M
 open N
 
-y
-  : ⊤
-y
-  = tt
+module O where
+
+  y
+    : ⊤
+  y
+    = tt
+
+open O renaming
+  ( y
+    to z
+  )
 

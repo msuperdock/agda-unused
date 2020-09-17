@@ -39,6 +39,12 @@ data RangeType where
   RangeImportItem
     :: RangeType
 
+  RangeMacro
+    :: RangeType
+
+  RangeMacroItem
+    :: RangeType
+
   RangeOpen
     :: RangeType
 

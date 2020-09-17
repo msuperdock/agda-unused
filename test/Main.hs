@@ -1,7 +1,7 @@
 module Main where
 
 import Agda.Unused
-  (Unused(..))
+  (Unused(..), UnusedItems(..))
 import Agda.Unused.Check
   (checkUnused)
 import Agda.Unused.Monad.Error
@@ -141,7 +141,7 @@ testUnused
   -> Expectation
 testUnused _ (Left _)
   = expectationFailure ""
-testUnused ns (Right (Unused rs))
+testUnused ns (Right (Unused (UnusedItems rs) _))
   = Set.fromList (rangeName <$> Map.elems rs) `shouldBe` ns
 
 -- ## Tests
@@ -201,10 +201,12 @@ testDeclaration
     (testCheckDeclaration "Syntax" ["p1", "p1'"])
   >> it "checks pattern synonyms (PatternSyn)"
     (testCheckDeclaration "PatternSyn" ["q", "f", "g"])
+  >> it "checks macros (Macro)"
+    (testCheckDeclaration "Macro" ["B", "C", "O"])
   >> it "checks postulates (Postulate)"
     (testCheckDeclaration "Postulate" ["g", "h"])
   >> it "checks open statements (Open)"
-    (testCheckDeclaration "Open" ["N", "x", "y"])
+    (testCheckDeclaration "Open" ["N", "O", "x", "y", "z"])
 
 -- ## Main
 

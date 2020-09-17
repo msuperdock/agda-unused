@@ -64,12 +64,12 @@ data ModuleState where
 -- | The current computation state.
 data State
   = State
-  { stateUnused
+  { stateItems
     :: !(Map Range RangeInfo)
     -- ^ Ranges for each unused item.
   , stateModules
     :: !(Map QName ModuleState)
-    -- ^ State for module dependencies.
+    -- ^ States for each module dependency.
   } deriving Show
 
 -- | Construct an empty state.

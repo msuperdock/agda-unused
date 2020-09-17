@@ -9,7 +9,7 @@ module Agda.Unused.Check
   ) where
 
 import Agda.Unused
-  (Unused(..))
+  (Unused(..), UnusedItems(..))
 import Agda.Unused.Monad.Error
   (Error(..), InternalError(..), UnexpectedError(..), UnsupportedError(..),
     liftLookup)
@@ -35,7 +35,7 @@ import qualified Agda.Unused.Types.Context
   as C
 import Agda.Unused.Types.Name
   (Name(..), QName(..), isBuiltin, fromAsName, fromName, fromNameRange,
-    fromQName, fromQNameRange, nameIds, qNamePath)
+    fromQName, fromQNameRange, nameIds, pathQName, qNamePath)
 import Agda.Unused.Types.Range
   (Range'(..), RangeInfo(..), RangeType(..))
 import Agda.Unused.Types.Root
@@ -77,9 +77,9 @@ import Control.Monad.Except
 import Control.Monad.IO.Class
   (MonadIO, liftIO)
 import Control.Monad.Reader
-  (MonadReader, runReaderT)
+  (MonadReader, ReaderT, runReaderT)
 import Control.Monad.State
-  (MonadState, gets, modify, runStateT)
+  (MonadState, StateT, gets, modify, runStateT)
 import Data.Bool
   (bool)
 import qualified Data.Map.Strict
@@ -89,7 +89,7 @@ import Data.Maybe
 import qualified Data.Text
   as T
 import System.Directory
-  (doesFileExist)
+  (doesDirectoryExist, doesFileExist, listDirectory)
 import System.FilePath
   ((</>))
 
@@ -1196,15 +1196,39 @@ checkNiceDeclaration b _ c
   >>= \c' -> checkExprs c es
   >> checkImportDirective Open b r n' c' i
   >>= pure . fromContext (importDirectiveAccess i)
+checkNiceDeclaration b _ c
+  (NiceModuleMacro r _ a
+    (SectionApp _ [] (RawApp _ (Ident n : es))) DontOpen i)
+  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
+  >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a)) (fromName a)
+  >>= \a' -> liftLookup r n' (accessContextLookupModule n' c)
+  >>= \c' -> checkExprs c es
+  >> checkImportDirective Macro b r (QName a') c' i
+  >>= \c'' -> pure (accessContextModule a' Public c'')
+checkNiceDeclaration b _ c
+  (NiceModuleMacro r _ a
+    (SectionApp _ [] (RawApp _ (Ident n : es))) DoOpen i)
+  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
+  >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a)) (fromName a)
+  >>= \a' -> liftLookup r n' (accessContextLookupModule n' c)
+  >>= \c' -> checkExprs c es
+  >> checkImportDirective Macro b r (QName a') c' i
+  >>= \c'' -> pure (accessContextModule a' Public c''
+    <> fromContext (importDirectiveAccess i) c'')
 checkNiceDeclaration _ _ _
-  (NiceModuleMacro r _ _ _ _ _)
+  (NiceModuleMacro _ _ _
+    (SectionApp r _ _) _ _)
+  = throwError (ErrorInternal ErrorMacro r)
+checkNiceDeclaration _ _ _
+  (NiceModuleMacro r _ _
+    (RecordModuleInstance _ _) _ _)
   = throwError (ErrorUnsupported UnsupportedMacro r)
 
 checkNiceDeclaration b _ c (NiceOpen r n i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> liftLookup r n' (accessContextLookupModule n' c)
   >>= \c' -> checkImportDirective Open b r n' c' i
-  >>= pure . fromContext (importDirectiveAccess i)
+  >>= \c'' -> pure (fromContext (importDirectiveAccess i) c'')
 
 checkNiceDeclaration b _ _ (NiceImport r n Nothing DontOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
@@ -1478,6 +1502,9 @@ data DirectiveType where
   Import
     :: DirectiveType
 
+  Macro
+    :: DirectiveType
+
   Open
     :: DirectiveType
 
@@ -1488,6 +1515,8 @@ directiveStatement
   -> RangeType
 directiveStatement Import
   = RangeImport
+directiveStatement Macro
+  = RangeMacro
 directiveStatement Open
   = RangeOpen
 
@@ -1496,6 +1525,8 @@ directiveItem
   -> RangeType
 directiveItem Import
   = RangeImportItem
+directiveItem Macro
+  = RangeMacroItem
 directiveItem Open
   = RangeOpenItem
 
@@ -1641,13 +1672,13 @@ modifyRenaming
 modifyRenaming dt b a c (Renaming (ImportedName n) (ImportedName t) _ _)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange t)) (fromNameRange t)
-  >>= \(r, t') -> modifyInsert b a r (RangeInfo (directiveItem dt) (QName n'))
+  >>= \(r, t') -> modifyInsert b a r (RangeInfo (directiveItem dt) (QName t'))
   >> contextRename n' t' r c
   >>= contextRenameModule n' t' r
 modifyRenaming dt b a c (Renaming (ImportedModule n) (ImportedModule t) _ _)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange t)) (fromNameRange t)
-  >>= \(r, t') -> modifyInsert b a r (RangeInfo (directiveItem dt) (QName n'))
+  >>= \(r, t') -> modifyInsert b a r (RangeInfo (directiveItem dt) (QName t'))
   >> contextRenameModule n' t' r c
 modifyRenaming _ _ _ _ r
   = throwError (ErrorInternal ErrorRenaming (getRange r))
@@ -1815,14 +1846,11 @@ checkUnused
   -> [Root]
   -- ^ A list of public entry points for the project.
   -> IO (Either Error Unused)
-checkUnused p
+checkUnused p rs
   = runExceptT
-  . fmap Unused
-  . fmap stateUnused
-  . fmap snd
-  . flip runStateT stateEmpty
-  . flip runReaderT (Environment False p)
-  . checkRoots
+  $ checkUnusedItems p (checkRoots rs)
+  >>= \(State is ms) -> checkPath (Map.keys ms) p p
+  >>= \fs -> pure (Unused (UnusedItems is) fs)
 
 -- | Check an Agda file for unused code.
 checkUnusedLocal
@@ -1830,13 +1858,55 @@ checkUnusedLocal
   -- ^ The project root path.
   -> QName
   -- ^ The module to check.
-  -> IO (Either Error Unused)
+  -> IO (Either Error UnusedItems)
 checkUnusedLocal p
   = runExceptT
-  . fmap Unused
-  . fmap stateUnused
-  . fmap snd
+  . fmap UnusedItems
+  . fmap stateItems
+  . checkUnusedItems p
+  . checkFile False Nothing
+
+checkUnusedItems
+  :: MonadError Error m
+  => MonadIO m
+  => FilePath
+  -> ReaderT Environment (StateT State m) a
+  -> m State
+checkUnusedItems p
+  = fmap snd
   . flip runStateT stateEmpty
   . flip runReaderT (Environment False p)
-  . checkFile False Nothing
+
+-- Look for unvisited modules at the given path.
+checkPath
+  :: MonadIO m
+  => [QName]
+  -- ^ The visited modules.
+  -> FilePath
+  -- ^ The project root path.
+  -> FilePath
+  -- ^ The path at which to look.
+  -> m [FilePath]
+checkPath ms p p'
+  = liftIO (doesDirectoryExist p')
+  >>= bool (pure (checkPathFile ms p p')) (checkPathDirectory ms p p')
+
+checkPathFile
+  :: [QName]
+  -> FilePath
+  -> FilePath
+  -> [FilePath]
+checkPathFile ms p p'
+  = maybe [] (bool [p'] [] . flip elem ms) (pathQName p p')
+
+checkPathDirectory
+  :: MonadIO m
+  => [QName]
+  -> FilePath
+  -> FilePath
+  -> m [FilePath]
+checkPathDirectory ms p p'
+  = fmap (p' </>) <$> liftIO (listDirectory p')
+  >>= traverse (checkPath ms p)
+  >>= pure . concat
 

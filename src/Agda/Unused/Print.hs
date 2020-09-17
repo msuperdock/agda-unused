@@ -6,10 +6,12 @@ Printing functions for unused items and errors.
 module Agda.Unused.Print
   ( printError
   , printUnused
+  , printUnusedItems
+  , printNothing
   ) where
 
 import Agda.Unused
-  (Unused(..), unusedNull)
+  (Unused(..), UnusedItems(..))
 import Agda.Unused.Monad.Error
   (Error(..), InternalError(..), UnexpectedError(..), UnsupportedError(..))
 import Agda.Unused.Types.Name
@@ -141,6 +143,8 @@ printInternalError
   -> Text
 printInternalError ErrorConstructor
   = "Invalid data constructor."
+printInternalError ErrorMacro
+  = "Invalid module application."
 printInternalError ErrorName
   = "Invalid name."
 printInternalError ErrorRenaming
@@ -176,20 +180,62 @@ printUnsupportedError
   :: UnsupportedError
   -> Text
 printUnsupportedError UnsupportedMacro
-  = "Module assignments"
+  = "Record module instance applications"
 printUnsupportedError UnsupportedUnquote
   = "Unquoting primitives"
 
 -- ## Unused
 
--- | Print a collection of unused ranges.
+-- | Print a collection of unused items and files.
 printUnused
   :: Unused
+  -> Maybe Text
+printUnused (Unused is fs)
+  = printUnusedWith
+    (printUnusedItems is)
+    (printUnusedFiles fs)
+
+printUnusedWith
+  :: Maybe Text
+  -> Maybe Text
+  -> Maybe Text
+printUnusedWith Nothing Nothing
+  = Nothing
+printUnusedWith Nothing (Just t2)
+  = Just t2
+printUnusedWith (Just t1) Nothing
+  = Just t1
+printUnusedWith (Just t1) (Just t2)
+  = Just (t1 <> t2)
+    
+printUnusedFiles
+  :: [FilePath]
+  -> Maybe Text
+printUnusedFiles []
+  = Nothing
+printUnusedFiles fs@(_ : _)
+  = Just (mconcat (printUnusedFile <$> fs))
+
+printUnusedFile
+  :: FilePath
   -> Text
-printUnused u | unusedNull u
+printUnusedFile f
+  = printMessageIndent (T.pack f) "unused file"
+
+-- | Print a collection of unused items.
+printUnusedItems
+  :: UnusedItems
+  -> Maybe Text
+printUnusedItems (UnusedItems rs) | Map.null rs
+  = Nothing
+printUnusedItems (UnusedItems rs)
+  = Just (Map.foldMapWithKey printRangeInfoWith rs)
+
+-- | Print a message indicating that no unused code was found.
+printNothing
+  :: Text
+printNothing
   = T.unlines ["No unused code."]
-printUnused (Unused rs)
-  = Map.foldMapWithKey printRangeInfoWith rs
 
 printRangeInfoWith
   :: Range
@@ -215,6 +261,10 @@ printRangeType RangeImport
   = "import"
 printRangeType RangeImportItem
   = "imported item"
+printRangeType RangeMacro
+  = "module assignment"
+printRangeType RangeMacroItem
+  = "module assignment item"
 printRangeType RangeOpen
   = "open"
 printRangeType RangeOpenItem

@@ -6,7 +6,7 @@ of unused Agda code structures.
 -}
 module Agda.Unused
   ( Unused(..)
-  , unusedNull
+  , UnusedItems(..)
   ) where
 
 import Agda.Unused.Types.Range
@@ -14,22 +14,22 @@ import Agda.Unused.Types.Range
 
 import Data.Map.Strict
   (Map)
-import qualified Data.Map.Strict
-  as Map
 
 -- ## Types
 
--- | A collection of unused items.
-newtype Unused
+-- | A collection of unused items and files.
+data Unused
   = Unused
-  { unusedMap
-    :: Map Range RangeInfo
+  { unusedItems
+    :: UnusedItems
+  , unusedFiles
+    :: [FilePath]
   } deriving Show
 
--- | Determine whether the given collection of unused items is empty.
-unusedNull
-  :: Unused
-  -> Bool
-unusedNull (Unused rs)
-  = Map.null rs
+-- | A collection of unused items.
+newtype UnusedItems
+  = UnusedItems
+  { unusedItemsMap
+    :: Map Range RangeInfo
+  } deriving Show
 

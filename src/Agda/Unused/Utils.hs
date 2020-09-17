@@ -13,6 +13,10 @@ module Agda.Unused.Utils
 
   , mapLeft
 
+    -- * List
+
+  , stripSuffix
+
     -- * Map
 
   , mapDeletes
@@ -22,6 +26,8 @@ module Agda.Unused.Utils
 
 import Control.Monad.Except
   (MonadError, throwError)
+import Data.List
+  (stripPrefix)
 import Data.Map.Strict
   (Map)
 import qualified Data.Map.Strict
@@ -51,6 +57,17 @@ mapLeft f (Left e)
   = Left (f e)
 mapLeft _ (Right x)
   = Right x
+
+-- ## List
+
+-- | Drop the given suffix from a list.
+stripSuffix
+  :: Eq a
+  => [a]
+  -> [a]
+  -> Maybe [a]
+stripSuffix xs ys
+  = reverse <$> stripPrefix (reverse xs) (reverse ys)
 
 -- ## Map
 

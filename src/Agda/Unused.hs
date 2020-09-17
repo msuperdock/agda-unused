@@ -22,7 +22,7 @@ data Unused
   = Unused
   { unusedItems
     :: UnusedItems
-  , unusedFiles
+  , unusedPaths
     :: [FilePath]
   } deriving Show
 

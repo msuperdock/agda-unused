@@ -105,7 +105,7 @@ printError
 
 printError (ErrorAmbiguous r n)
   = printMessage (printRange r)
-  $ "Error: Ambiguous name " <> parens (printQName n) <> "."
+  $ "Error: Ambiguous name " <> parens (quote (printQName n)) <> "."
 printError (ErrorCyclic r n)
   = printMessage (maybe (printQName n) printRange r)
   $ "Error: Cyclic module dependency " <> parens (printQName n) <> "."
@@ -124,6 +124,9 @@ printError (ErrorOpen r n)
 printError (ErrorPolarity (Just r))
   = printMessage (printRange r)
   $ "Error: Multiple polarity declarations."
+printError (ErrorRoot m n)
+  = printMessage (printQName m)
+  $ "Error: Root not found " <> parens (quote (printQName n)) <> "."
 printError (ErrorUnsupported e r)
   = printMessage (printRange r)
   $ "Error: " <> printUnsupportedError e <> " not supported."
@@ -190,10 +193,10 @@ printUnsupportedError UnsupportedUnquote
 printUnused
   :: Unused
   -> Maybe Text
-printUnused (Unused is fs)
+printUnused (Unused is ps)
   = printUnusedWith
     (printUnusedItems is)
-    (printUnusedFiles fs)
+    (printUnusedPaths ps)
 
 printUnusedWith
   :: Maybe Text
@@ -208,19 +211,19 @@ printUnusedWith (Just t1) Nothing
 printUnusedWith (Just t1) (Just t2)
   = Just (t2 <> t1)
     
-printUnusedFiles
+printUnusedPaths
   :: [FilePath]
   -> Maybe Text
-printUnusedFiles []
+printUnusedPaths []
   = Nothing
-printUnusedFiles fs@(_ : _)
-  = Just (mconcat (printUnusedFile <$> fs))
+printUnusedPaths ps@(_ : _)
+  = Just (mconcat (printUnusedPath <$> ps))
 
-printUnusedFile
+printUnusedPath
   :: FilePath
   -> Text
-printUnusedFile f
-  = printMessageIndent (T.pack f) "unused file"
+printUnusedPath p
+  = printMessageIndent (T.pack p) "unused file"
 
 -- | Print a collection of unused items.
 printUnusedItems

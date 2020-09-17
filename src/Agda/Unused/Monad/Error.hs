@@ -92,6 +92,12 @@ data Error where
     :: !(Maybe Range)
     -> Error
 
+  -- | Root not found.
+  ErrorRoot
+    :: !QName
+    -> !QName
+    -> Error
+
   -- | Unsupported language feature.
   ErrorUnsupported
     :: !UnsupportedError

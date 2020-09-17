@@ -406,22 +406,26 @@ touchQNameWith _ _ rs b
   = touchNameWith rs b
 
 touchQNameContext
-  :: MonadReader Environment m
+  :: MonadError Error m
+  => MonadReader Environment m
   => MonadState State m
   => Context
   -> QName
+  -> QName
   -> m ()
-touchQNameContext c n
-  = maybe (pure ()) modifyDelete (contextLookup n c)
+touchQNameContext c m n
+  = maybe (throwError (ErrorRoot m n)) modifyDelete (contextLookup n c)
 
 touchQNamesContext
-  :: MonadReader Environment m
+  :: MonadError Error m
+  => MonadReader Environment m
   => MonadState State m
   => Context
+  -> QName
   -> [QName]
   -> m ()
-touchQNamesContext c
-  = void . traverse (touchQNameContext c)
+touchQNamesContext m p
+  = void . traverse (touchQNameContext m p)
 
 touchQName'
   :: MonadError Error m
@@ -1814,6 +1818,41 @@ checkFilePath b r n p = do
     <- modify (stateCheck n context)
   pure context
 
+-- ## Paths
+
+-- Look for unvisited modules at the given path.
+checkPath
+  :: MonadIO m
+  => [QName]
+  -- ^ The visited modules.
+  -> FilePath
+  -- ^ The project root path.
+  -> FilePath
+  -- ^ The path at which to look.
+  -> m [FilePath]
+checkPath ms p p'
+  = liftIO (doesDirectoryExist p')
+  >>= bool (pure (checkPathFile ms p p')) (checkPathDirectory ms p p')
+
+checkPathFile
+  :: [QName]
+  -> FilePath
+  -> FilePath
+  -> [FilePath]
+checkPathFile ms p p'
+  = maybe [] (bool [p'] [] . flip elem ms) (pathQName p p')
+
+checkPathDirectory
+  :: MonadIO m
+  => [QName]
+  -> FilePath
+  -> FilePath
+  -> m [FilePath]
+checkPathDirectory ms p p'
+  = fmap (p' </>) <$> liftIO (listDirectory p')
+  >>= traverse (checkPath ms p)
+  >>= pure . concat
+
 -- ## Roots
 
 checkRoot
@@ -1823,9 +1862,9 @@ checkRoot
   => MonadIO m
   => Root
   -> m ()
-checkRoot (Root f ns)
-  = checkFile True Nothing f
-  >>= flip touchQNamesContext ns
+checkRoot (Root p ns)
+  = checkFile True Nothing p
+  >>= \c -> touchQNamesContext c p ns
 
 checkRoots
   :: MonadError Error m
@@ -1876,37 +1915,4 @@ checkUnusedItems p
   = fmap snd
   . flip runStateT stateEmpty
   . flip runReaderT (Environment False p)
-
--- Look for unvisited modules at the given path.
-checkPath
-  :: MonadIO m
-  => [QName]
-  -- ^ The visited modules.
-  -> FilePath
-  -- ^ The project root path.
-  -> FilePath
-  -- ^ The path at which to look.
-  -> m [FilePath]
-checkPath ms p p'
-  = liftIO (doesDirectoryExist p')
-  >>= bool (pure (checkPathFile ms p p')) (checkPathDirectory ms p p')
-
-checkPathFile
-  :: [QName]
-  -> FilePath
-  -> FilePath
-  -> [FilePath]
-checkPathFile ms p p'
-  = maybe [] (bool [p'] [] . flip elem ms) (pathQName p p')
-
-checkPathDirectory
-  :: MonadIO m
-  => [QName]
-  -> FilePath
-  -> FilePath
-  -> m [FilePath]
-checkPathDirectory ms p p'
-  = fmap (p' </>) <$> liftIO (listDirectory p')
-  >>= traverse (checkPath ms p)
-  >>= pure . concat
 

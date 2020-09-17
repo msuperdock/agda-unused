@@ -9,6 +9,7 @@ in
   derivation.env.overrideAttrs (oldAttrs: {
     buildInputs = oldAttrs.buildInputs ++ [
       packages.cabal-install
+      packages.haskellPackages.Agda
     ];
   })
 

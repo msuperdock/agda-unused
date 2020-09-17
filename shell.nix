@@ -1,8 +1,14 @@
 let
 
-  pkgs = import <unstable> {};
+  sources = import ./nix/sources.nix;
+  packages = import sources.nixpkgs {};
+  derivation = packages.haskellPackages.callPackage ./default.nix {};
 
 in
 
-  (pkgs.haskellPackages.callPackage ./default.nix {}).env
+  derivation.env.overrideAttrs (oldAttrs: {
+    buildInputs = oldAttrs.buildInputs ++ [
+      packages.cabal-install
+    ];
+  })
 

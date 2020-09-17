@@ -206,7 +206,7 @@ printUnusedWith Nothing (Just t2)
 printUnusedWith (Just t1) Nothing
   = Just t1
 printUnusedWith (Just t1) (Just t2)
-  = Just (t1 <> t2)
+  = Just (t2 <> t1)
     
 printUnusedFiles
   :: [FilePath]

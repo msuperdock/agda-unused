@@ -84,8 +84,8 @@ names, identifiers, and the list symbol (`-`) appear in an appropriate order,
 separated by any number of spaces of any kind.
 
 We also supply an `agda-roots` executable which extracts a list of root files,
-separated by single spaces, from an `.agda-roots` file; run `agda-roots --help`
-for more information.
+separated by newlines, from an `.agda-roots` file; run `agda-roots --help` for
+more information.
 
 ## Usage
 

@@ -38,6 +38,8 @@ import Options.Applicative
     info, long, metavar, optional, progDesc, short, strOption, switch)
 import System.Directory
   (doesFileExist, getCurrentDirectory, makeAbsolute)
+import System.Exit
+  (exitFailure, exitSuccess)
 import System.FilePath
   ((</>), splitDirectories, stripExtension, takeDirectory)
 
@@ -112,7 +114,7 @@ check
   -> IO ()
 check o@(Options _ _ j)
   = runExceptT (check' o)
-  >>= either (I.putStr . printErrorWith j) (const (pure ()))
+  >>= either (printErrorWith j) (const (pure ()))
 
 check'
   :: MonadError Error m
@@ -136,7 +138,7 @@ check' o@(Options _ Nothing j) = do
   checkResult
     <- liftIO (checkUnused rootPath roots)
   _
-    <- liftIO (I.putStr (printResult j P.printUnused checkResult))
+    <- liftIO (printResult j P.printUnused checkResult)
   pure ()
 
 check' o@(Options _ (Just f) j) = do
@@ -151,7 +153,7 @@ check' o@(Options _ (Just f) j) = do
   checkResult
     <- liftIO (checkUnusedLocal rootPath localModule)
   _
-    <- liftIO (I.putStr (printResult j P.printUnusedItems checkResult))
+    <- liftIO (printResult j P.printUnusedItems checkResult)
   pure ()
 
 pathModule
@@ -172,15 +174,28 @@ name p
 
 -- ## Print
 
+printResult
+  :: Bool
+  -- ^ Whether to output JSON.
+  -> (a -> Maybe Text)
+  -> Either E.Error a
+  -> IO ()
+printResult False _ (Left e)
+  = I.putStrLn (P.printError e) >> exitFailure
+printResult False p (Right x)
+  = I.putStrLn (maybe P.printNothing id (p x)) >> exitSuccess
+printResult True p x
+  = I.putStrLn (toStrict (encodeToLazyText (printResultJSON p x)))
+
 printErrorWith
   :: Bool
   -- ^ Whether to output JSON.
   -> Error
-  -> Text
-printErrorWith False
-  = printError
-printErrorWith True
-  = toStrict . encodeToLazyText . printErrorJSON
+  -> IO ()
+printErrorWith False e
+  = I.putStrLn (printError e) >> exitFailure
+printErrorWith True e
+  = I.putStrLn (toStrict (encodeToLazyText (printErrorJSON e)))
 
 printError
   :: Error
@@ -191,17 +206,6 @@ printError (ErrorLocal l)
   = "Error: Invalid local path " <> parens (T.pack l) <> "."
 printError (ErrorParse t)
   = t
-
-printResult
-  :: Bool
-  -- ^ Whether to output JSON.
-  -> (a -> Maybe Text)
-  -> Either E.Error a
-  -> Text
-printResult False p
-  = either P.printError (maybe P.printNothing id . p)
-printResult True p
-  = toStrict . encodeToLazyText . printResultJSON p
 
 parens
   :: Text

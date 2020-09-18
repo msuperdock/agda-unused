@@ -26,6 +26,8 @@ import Options.Applicative
     info, long, metavar, optional, progDesc, short, strOption)
 import System.Directory
   (doesFileExist, getCurrentDirectory, makeAbsolute)
+import System.Exit
+  (exitFailure, exitSuccess)
 import System.FilePath
   ((</>), takeDirectory)
 
@@ -81,7 +83,7 @@ getRoots
   -> IO ()
 getRoots o
   = runExceptT (getRoots' o)
-  >>= either (I.putStr . printError) (const (pure ()))
+  >>= either printError (const (pure ()))
 
 getRoots'
   :: MonadError Error m
@@ -102,7 +104,7 @@ getRoots' o = do
   roots
     <- liftEither (mapLeft ErrorParse (parseConfig contents))
   _
-    <- liftIO (I.putStr (printRoots rootPath roots))
+    <- liftIO (printRoots rootPath roots)
   pure ()
 
 -- ## Print
@@ -110,9 +112,9 @@ getRoots' o = do
 printRoots
   :: FilePath
   -> [Root]
-  -> Text
+  -> IO ()
 printRoots p rs
-  = T.unwords (printRoot p <$> rs)
+  = I.putStrLn (T.unlines (printRoot p <$> rs)) >> exitSuccess
 
 printRoot
   :: FilePath
@@ -123,11 +125,17 @@ printRoot p (Root n _)
 
 printError
   :: Error
-  -> Text
+  -> IO ()
 printError (ErrorFile p)
-  = "Error: .agda-roots file not found " <> parens (T.pack p) <> "."
+  = I.putStrLn (printErrorFile p) >> exitFailure
 printError (ErrorParse t)
-  = t
+  = I.putStrLn t >> exitFailure
+
+printErrorFile
+  :: FilePath
+  -> Text
+printErrorFile p
+  = "Error: .agda-roots file not found " <> parens (T.pack p) <> "."
 
 parens
   :: Text

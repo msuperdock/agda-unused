@@ -103,6 +103,8 @@ data Error where
     :: !Text
     -> Error
 
+  deriving Show
+
 -- ## Check
 
 check

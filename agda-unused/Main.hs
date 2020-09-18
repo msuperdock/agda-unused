@@ -42,6 +42,8 @@ import System.Exit
   (exitFailure, exitSuccess)
 import System.FilePath
   ((</>), splitDirectories, stripExtension, takeDirectory)
+import System.IO
+  (stderr)
 
 -- ## Options
 
@@ -181,7 +183,7 @@ printResult
   -> Either E.Error a
   -> IO ()
 printResult False _ (Left e)
-  = I.putStrLn (P.printError e) >> exitFailure
+  = I.hPutStrLn stderr (P.printError e) >> exitFailure
 printResult False p (Right x)
   = I.putStrLn (maybe P.printNothing id (p x)) >> exitSuccess
 printResult True p x
@@ -193,7 +195,7 @@ printErrorWith
   -> Error
   -> IO ()
 printErrorWith False e
-  = I.putStrLn (printError e) >> exitFailure
+  = I.hPutStrLn stderr (printError e) >> exitFailure
 printErrorWith True e
   = I.putStrLn (toStrict (encodeToLazyText (printErrorJSON e)))
 

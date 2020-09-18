@@ -30,6 +30,8 @@ import System.Exit
   (exitFailure, exitSuccess)
 import System.FilePath
   ((</>), takeDirectory)
+import System.IO
+  (stderr)
 
 -- ## Options
 
@@ -127,9 +129,9 @@ printError
   :: Error
   -> IO ()
 printError (ErrorFile p)
-  = I.putStrLn (printErrorFile p) >> exitFailure
+  = I.hPutStrLn stderr (printErrorFile p) >> exitFailure
 printError (ErrorParse t)
-  = I.putStrLn t >> exitFailure
+  = I.hPutStrLn stderr t >> exitFailure
 
 printErrorFile
   :: FilePath

@@ -79,8 +79,9 @@ Spacing and indentation are irrelevant; the only requirement is that module
 names, identifiers, and the list symbol (`-`) appear in an appropriate order,
 separated by any number of spaces of any kind.
 
-We also supply an `agda-roots` executable which extracts a shell-friendly list
-of root files from an `.agda-roots` file; run `agda-roots -h` for information.
+We also supply an `agda-roots` executable which extracts a list of root files,
+separated by single spaces, from an `.agda-roots` file; run `agda-roots -h` for
+more information.
 
 ## Usage
 

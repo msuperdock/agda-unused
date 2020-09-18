@@ -1,8 +1,7 @@
 {- |
 Module: Agda.Unused.Types.Root
 
-A data type representing a public entry point for an Agda project, which should
-not generate a warning if unused internally.
+A data type representing a public entry point for an Agda project.
 -}
 module Agda.Unused.Types.Root
   ( Root(..)
@@ -11,15 +10,14 @@ module Agda.Unused.Types.Root
 import Agda.Unused.Types.Name
   (QName)
 
--- | A public entry point for an Agda project, which should not generate a
--- warning if unused internally.
+-- | A public entry point for an Agda project.
 data Root
   = Root
   { rootFile
     :: QName
     -- ^ A module name.
   , rootNames
-    :: [QName]
-    -- ^ An identifier name, in top-level scope at the end of the module.
+    :: Maybe [QName]
+    -- ^ Identifier names. An value of 'Nothing' represents all names in scope.
   } deriving Show
 

@@ -58,8 +58,10 @@ Output:
 
 Running `agda-unused` globally requires an `.agda-roots` file in the project
 root directory. The `.agda-roots` format consists of module names, each followed
-by a (possibly empty) list of identifiers. Identifiers may be qualified; this
-allows us to refer to identifiers defined within inner modules.
+by a list of identifiers. Identifiers may be qualified; this allows us to refer
+to identifiers defined within inner modules. If no identifiers are given for a
+module, then all publicly accessible identifiers in that module are considered
+roots, and will not be marked unused.
 
 Example:
 
@@ -67,9 +69,11 @@ Example:
 Main
 - main
 
-Pythagorean.Interface
+Pythagorean.Core
 - isTriple
 - allTriples
+
+Pythagorean.Theorems
 
 Pythagorean.Utils
 - Print.prettyNat

@@ -114,7 +114,7 @@ testCheckNames
   -- ^ Expected unused names.
   -> Expectation
 testCheckNames f m us
-  = checkUnused ("data/test" </> f) [Root (name m) []]
+  = checkUnused ("data/test" </> f) [Root (name m) (Just [])]
   >>= testUnused (Set.fromList us)
 
 testCheckNamesPattern

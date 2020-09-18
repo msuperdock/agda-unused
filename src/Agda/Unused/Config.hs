@@ -45,6 +45,14 @@ isNameChar c | isSpace c
 isNameChar _
   = True
 
+listMaybe
+  :: [a]
+  -> Maybe [a]
+listMaybe []
+  = Nothing
+listMaybe xs@(_ : _)
+  = Just xs
+
 -- ## Parsers
 
 type Parser
@@ -84,7 +92,7 @@ parseQName
 parseQName
   = try (Qual
     <$> parseName
-    <*  parseDot
+    <* parseDot
     <*> parseQName)
   <|> QName
     <$> parseName
@@ -94,9 +102,16 @@ parseRootName
   :: Parser QName
 parseRootName
   = parseHyphen
-   *> parseSpace
-   *> parseQName
-  <*  parseSpace
+  *> parseSpace
+  *> parseQName
+  <* parseSpace
+
+-- Consume spaces afterwards.
+parseRootNames
+  :: Parser (Maybe [QName])
+parseRootNames
+  = listMaybe
+  <$> many parseRootName
 
 -- Consume spaces afterwards.
 parseRoot
@@ -104,8 +119,8 @@ parseRoot
 parseRoot
   = Root
     <$> parseQName
-    <*  parseSpace
-    <*> many parseRootName
+    <* parseSpace
+    <*> parseRootNames
 
 -- | Parse configuration, producing either an error message or a list of roots.
 parseConfig

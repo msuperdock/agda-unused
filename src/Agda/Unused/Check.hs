@@ -1862,7 +1862,10 @@ checkRoot
   => MonadIO m
   => Root
   -> m ()
-checkRoot (Root p ns)
+checkRoot (Root p Nothing)
+  = checkFile False Nothing p
+  >> pure ()
+checkRoot (Root p (Just ns))
   = checkFile True Nothing p
   >>= \c -> touchQNamesContext c p ns
 

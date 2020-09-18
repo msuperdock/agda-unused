@@ -110,7 +110,6 @@ executable agda-unused
     Haskell2010
   default-extensions:
     FlexibleContexts,
-    FlexibleInstances,
     GADTs,
     OverloadedStrings
   ghc-options:

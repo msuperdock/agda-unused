@@ -8,11 +8,13 @@ module Agda.Unused.Monad.State
   ( -- * Definitions
 
     ModuleState(..)
-  , State(..)
+  , State
 
     -- * Interface
 
   , stateEmpty
+  , stateItems
+  , stateModules
   , stateBlock
   , stateCheck
   , stateLookup
@@ -31,7 +33,7 @@ import Agda.Unused.Types.Context
 import Agda.Unused.Types.Name
   (QName)
 import Agda.Unused.Types.Range
-  (Range, Range'(..), RangeInfo)
+  (Range, Range'(..), RangeInfo, rangeContains)
 import Agda.Unused.Utils
   (mapDeletes)
 
@@ -64,10 +66,10 @@ data ModuleState where
 -- | The current computation state.
 data State
   = State
-  { stateItems
+  { _stateItems
     :: !(Map Range RangeInfo)
     -- ^ Ranges for each unused item.
-  , stateModules
+  , _stateModules
     :: !(Map QName ModuleState)
     -- ^ States for each module dependency.
   } deriving Show
@@ -77,6 +79,37 @@ stateEmpty
   :: State
 stateEmpty
   = State mempty mempty
+
+-- | Get a sorted list of state items.
+--
+-- If one state item contains another (e.g., an @open@ statement containing
+-- @using@ directives), then keep only the containing item.
+stateItems
+  :: State
+  -> [(Range, RangeInfo)]
+stateItems
+  = stateItemsFilter
+  . Map.toAscList
+  . _stateItems
+
+-- | Get a list of visited modules.
+stateModules
+  :: State
+  -> [QName]
+stateModules
+  = Map.keys
+  . _stateModules
+
+-- Remove nested items.
+stateItemsFilter
+  :: [(Range, RangeInfo)]
+  -> [(Range, RangeInfo)]
+stateItemsFilter []
+  = []
+stateItemsFilter (i : i' : is) | rangeContains (fst i) (fst i')
+  = stateItemsFilter (i : is)
+stateItemsFilter (i : is)
+  = i : stateItemsFilter is
 
 stateInsert
   :: Range

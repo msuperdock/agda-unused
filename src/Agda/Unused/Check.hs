@@ -16,8 +16,8 @@ import Agda.Unused.Monad.Error
 import Agda.Unused.Monad.Reader
   (Environment(..), askLocal, askRoot, askSkip, localSkip)
 import Agda.Unused.Monad.State
-  (ModuleState(..), State(..), modifyDelete, modifyInsert, stateBlock,
-    stateCheck, stateEmpty, stateLookup)
+  (ModuleState(..), State, modifyDelete, modifyInsert, stateBlock,
+    stateCheck, stateEmpty, stateItems, stateLookup, stateModules)
 import Agda.Unused.Types.Access
   (Access(..), fromAccess)
 import Agda.Unused.Types.Context
@@ -1823,8 +1823,8 @@ checkUnused
 checkUnused p rs
   = runExceptT
   $ checkUnusedItems False p (checkRoots rs)
-  >>= \(State is ms) -> checkPath (Map.keys ms) p p
-  >>= \fs -> pure (Unused (UnusedItems is) fs)
+  >>= \s -> checkPath (stateModules s) p p
+  >>= \fs -> pure (Unused (UnusedItems (stateItems s)) fs)
 
 -- | Check an Agda file for unused code.
 checkUnusedLocal

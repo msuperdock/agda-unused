@@ -12,9 +12,6 @@ module Agda.Unused
 import Agda.Unused.Types.Range
   (Range, RangeInfo)
 
-import Data.Map.Strict
-  (Map)
-
 -- ## Types
 
 -- | A collection of unused items and files.
@@ -29,7 +26,7 @@ data Unused
 -- | A collection of unused items.
 newtype UnusedItems
   = UnusedItems
-  { unusedItemsMap
-    :: Map Range RangeInfo
+  { unusedItemsList
+    :: [(Range, RangeInfo)]
   } deriving Show
 

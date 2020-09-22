@@ -15,6 +15,7 @@ module Agda.Unused.Types.Range
     -- * Interface
 
   , getRange
+  , rangeContains
 
   ) where
 
@@ -22,7 +23,7 @@ import Agda.Unused.Types.Name
   (QName)
 
 import Agda.Syntax.Position
-  (Range, Range'(..), getRange)
+  (PositionWithoutFile, Range, Range'(..), getRange, rEnd', rStart')
 
 -- | The type of item found at a range.
 data RangeType where
@@ -75,4 +76,23 @@ data RangeInfo
     :: !QName
     -- ^ The name of the item.
   } deriving Show
+
+-- | Determine whether the first range contains the second.
+rangeContains
+  :: Range
+  -> Range
+  -> Bool
+rangeContains r1 r2
+  = rangeContains' (rStart' r1) (rEnd' r1) (rStart' r2) (rEnd' r2)
+
+rangeContains'
+  :: Maybe PositionWithoutFile
+  -> Maybe PositionWithoutFile
+  -> Maybe PositionWithoutFile
+  -> Maybe PositionWithoutFile
+  -> Bool
+rangeContains' (Just s1) (Just e1) (Just s2) (Just e2)
+  = s1 <= s2 && e1 >= e2
+rangeContains' _ _ _ _
+  = False
 

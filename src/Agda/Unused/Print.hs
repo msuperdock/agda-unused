@@ -21,8 +21,6 @@ import Agda.Unused.Types.Range
 
 import Agda.Utils.Pretty
   (prettyShow)
-import qualified Data.Map.Strict
-  as Map
 import Data.Text
   (Text)
 import qualified Data.Text
@@ -229,10 +227,10 @@ printUnusedPath p
 printUnusedItems
   :: UnusedItems
   -> Maybe Text
-printUnusedItems (UnusedItems rs) | Map.null rs
+printUnusedItems (UnusedItems [])
   = Nothing
-printUnusedItems (UnusedItems rs)
-  = Just (Map.foldMapWithKey printRangeInfoWith rs)
+printUnusedItems (UnusedItems rs@(_ : _))
+  = Just (foldMap (uncurry printRangeInfoWith) rs)
 
 -- | Print a message indicating that no unused code was found.
 printNothing

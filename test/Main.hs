@@ -13,8 +13,6 @@ import Agda.Unused.Types.Range
 import Agda.Unused.Types.Root
   (Root(..))
 
-import qualified Data.Map.Strict
-  as Map
 import Data.Set
   (Set)
 import qualified Data.Set
@@ -158,7 +156,7 @@ testUnused
 testUnused _ (Left _)
   = expectationFailure ""
 testUnused ns (Right (UnusedItems rs))
-  = Set.fromList (rangeName <$> Map.elems rs) `shouldBe` ns
+  = Set.fromList (rangeName . snd <$> rs) `shouldBe` ns
 
 -- ## Tests
 
@@ -218,12 +216,12 @@ testDeclaration
   >> it "checks pattern synonyms (PatternSyn)"
     (testCheck Global Declaration "PatternSyn" ["q", "f", "g"])
   >> it "checks macros (Macro)"
-    (testCheck Global Declaration "Macro" ["B", "C", "O", "x"]
+    (testCheck Global Declaration "Macro" ["C", "O", "x"]
     >> testCheck Local Declaration "Macro" ["x"])
   >> it "checks postulates (Postulate)"
     (testCheck Global Declaration "Postulate" ["g", "h"])
   >> it "checks open statements (Open)"
-    (testCheck Global Declaration "Open" ["N", "O", "x", "y", "z"])
+    (testCheck Global Declaration "Open" ["N", "O", "x", "y"])
 
 -- ## Main
 

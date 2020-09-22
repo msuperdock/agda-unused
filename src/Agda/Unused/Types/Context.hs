@@ -23,7 +23,6 @@ module Agda.Unused.Types.Context
   , contextLookupModule
   , accessContextLookup
   , accessContextLookupModule
-  , accessContextLookupAccess
   , accessContextLookupDefining
   , accessContextLookupSpecial
   
@@ -359,23 +358,6 @@ resolve (x : [])
   = Right x
 resolve (_ : _ : _)
   = Left LookupAmbiguous
-
-accessItemAccess
-  :: AccessItem
-  -> Maybe (Access, [Range])
-accessItemAccess (AccessItem _ a rs _)
-  = Just (a, rs)
-accessItemAccess _
-  = Nothing
-
--- | Get the access and ranges for the given name, if it corresponds to an
--- ordinary access item in context.
-accessContextLookupAccess
-  :: Name
-  -> AccessContext
-  -> Maybe (Access, [Range])
-accessContextLookupAccess n (AccessContext is _ _)
-  = Map.lookup n is >>= accessItemAccess
 
 accessItemDefining
   :: AccessItem

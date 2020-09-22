@@ -12,6 +12,7 @@ module Agda.Unused.Monad.Reader
     -- * Ask
 
   , askSkip
+  , askLocal
   , askRoot
 
     -- * Local
@@ -28,18 +29,14 @@ data Environment
   = Environment
   { environmentSkip
     :: !Bool
-    -- ^ Whether to skip checking names.
+    -- ^ Whether to skip all names.
+  , environmentLocal
+    :: !Bool
+    -- ^ Whether to skip public names.
   , environmentRoot
     :: !FilePath
     -- ^ The project root path.
   } deriving Show
-
--- | Ask for the project root path.
-askRoot
-  :: MonadReader Environment m
-  => m FilePath
-askRoot
-  = environmentRoot <$> ask
 
 -- | Ask whether to skip checking names.
 askSkip
@@ -47,6 +44,20 @@ askSkip
   => m Bool
 askSkip
   = environmentSkip <$> ask
+
+-- | Ask whether to skip checking public names.
+askLocal
+  :: MonadReader Environment m
+  => m Bool
+askLocal
+  = environmentLocal <$> ask
+
+-- | Ask for the project root path.
+askRoot
+  :: MonadReader Environment m
+  => m FilePath
+askRoot
+  = environmentRoot <$> ask
 
 -- | Skip checking names in a local computation.
 localSkip

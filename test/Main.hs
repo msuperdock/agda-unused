@@ -3,7 +3,7 @@ module Main where
 import Agda.Unused
   (Unused(..), UnusedItems(..))
 import Agda.Unused.Check
-  (checkUnused)
+  (checkUnused, checkUnusedLocal)
 import Agda.Unused.Monad.Error
   (Error)
 import Agda.Unused.Types.Name
@@ -23,6 +23,9 @@ import System.FilePath
   ((</>))
 import Test.Hspec
   (Expectation, Spec, describe, expectationFailure, hspec, it, shouldBe)
+
+import Paths_agda_unused
+  (getDataFileName)
 
 -- ## Utilities
 
@@ -65,83 +68,96 @@ bind_
   , Hole
   ]
 
+-- ## Types
+
+data TestMode where
+
+  Global
+    :: TestMode
+
+  Local
+    :: TestMode
+
+  deriving Show
+
+testMode
+  :: a
+  -> a
+  -> TestMode
+  -> a
+testMode x _ Global
+  = x
+testMode _ x Local
+  = x
+
+data TestType where
+
+  Pattern
+    :: TestType
+
+  Expression
+    :: TestType
+
+  Declaration
+    :: TestType
+
+  deriving Show
+
+testTypeDir
+  :: TestType
+  -> FilePath
+testTypeDir Pattern
+  = "pattern"
+testTypeDir Expression
+  = "expression"
+testTypeDir Declaration
+  = "declaration"
+
+testTypePath
+  :: TestType
+  -> IO FilePath
+testTypePath t
+  = getDataFileName ("data/test" </> testTypeDir t)
+
 -- ## Expectations
 
 testCheck
-  :: String
-  -- ^ Folder of test file.
+  :: TestMode
+  -- ^ Mode of test.
+  -> TestType
+  -- ^ Type of test.
   -> String
   -- ^ Name of test module.
   -> [String]
   -- ^ Expected unused identifiers.
   -> Expectation
-testCheck f m us
-  = testCheckNames f m (name <$> us)
-
-testCheckPattern
-  :: String
-  -- ^ Name of test module.
-  -> [String]
-  -- ^ Expected unused identifiers.
-  -> Expectation
-testCheckPattern
-  = testCheck "pattern"
-
-testCheckExpression
-  :: String
-  -- ^ Name of test module.
-  -> [String]
-  -- ^ Expected unused identifiers.
-  -> Expectation
-testCheckExpression
-  = testCheck "expression"
-
-testCheckDeclaration
-  :: String
-  -- ^ Name of test module.
-  -> [String]
-  -- ^ Expected unused identifiers.
-  -> Expectation
-testCheckDeclaration
-  = testCheck "declaration"
+testCheck m t m' us
+  = testCheckNames m t m' (name <$> us)
 
 testCheckNames
-  :: String
-  -- ^ Folder of test file.
+  :: TestMode
+  -- ^ Mode of test.
+  -> TestType
+  -- ^ Type of test.
   -> String
   -- ^ Name of test module.
   -> [QName]
   -- ^ Expected unused names.
   -> Expectation
-testCheckNames f m us
-  = checkUnused ("data/test" </> f) [Root (name m) (Just [])]
+testCheckNames m t m' us
+  = testTypePath t
+  >>= \p -> testMode
+    (fmap unusedItems <$> checkUnused p [Root (name m') (Just [])])
+    (checkUnusedLocal p (name m')) m
   >>= testUnused (Set.fromList us)
-
-testCheckNamesPattern
-  :: String
-  -- ^ Name of test module.
-  -> [QName]
-  -- ^ Expected unused names.
-  -> Expectation
-testCheckNamesPattern
-  = testCheckNames "pattern"
-
-testCheckNamesExpression
-  :: String
-  -- ^ Name of test module.
-  -> [QName]
-  -- ^ Expected unused names.
-  -> Expectation
-testCheckNamesExpression
-  = testCheckNames "expression"
 
 testUnused
   :: Set QName
-  -> Either Error Unused
+  -> Either Error UnusedItems
   -> Expectation
 testUnused _ (Left _)
   = expectationFailure ""
-testUnused ns (Right (Unused (UnusedItems rs) _))
+testUnused ns (Right (UnusedItems rs))
   = Set.fromList (rangeName <$> Map.elems rs) `shouldBe` ns
 
 -- ## Tests
@@ -159,54 +175,54 @@ testPattern
 testPattern
   = describe "patterns"
   $ it "checks identifiers (IdentP)"
-    (testCheckPattern "IdentP" ["y", "f", "g"])
+    (testCheck Global Pattern "IdentP" ["y", "f", "g"])
   >> it "checks operator applications (OpAppP)"
-    (testCheckNamesPattern "OpAppP" [land])
+    (testCheckNames Global Pattern "OpAppP" [land])
   >> it "checks as-patterns (AsP)"
-    (testCheckPattern "AsP" ["y", "z", "w", "z'", "w'", "f", "g"])
+    (testCheck Global Pattern "AsP" ["y", "z", "w", "z'", "w'", "f", "g"])
 
 testExpression
   :: Spec
 testExpression
   = describe "expressions"
   $ it "checks with-applications (WithApp)"
-    (testCheckExpression "WithApp" ["f", "g"])
+    (testCheck Global Expression "WithApp" ["f", "g"])
   >> it "checks lambdas (Lam)"
-    (testCheckExpression "Lam" ["y", "y'", "f", "g"])
+    (testCheck Global Expression "Lam" ["y", "y'", "f", "g"])
   >> it "checks extended lambdas (ExtendedLam)"
-    (testCheckExpression "ExtendedLam" ["x", "f"])
+    (testCheck Global Expression "ExtendedLam" ["x", "f"])
   >> it "checks pi-types (Pi)"
-    (testCheckExpression "Pi" ["y", "w", "f"])
+    (testCheck Global Expression "Pi" ["y", "w", "f"])
   >> it "checks let-blocks (Let)"
-    (testCheckExpression "Let" ["z", "f"])
+    (testCheck Global Expression "Let" ["z", "f"])
   >> it "checks do-blocks (DoBlock)"
-    (testCheckExpression "DoBlock1" ["z", "f"]
-    >> testCheckNamesExpression "DoBlock2" [bind_, name "f"]
-    >> testCheckNamesExpression "DoBlock3" [bind, name "f"]
-    >> testCheckNamesExpression "DoBlock4" [bind, bind_, name "f"])
+    (testCheck Global Expression "DoBlock1" ["z", "f"]
+    >> testCheckNames Global Expression "DoBlock2" [bind_, name "f"]
+    >> testCheckNames Global Expression "DoBlock3" [bind, name "f"]
+    >> testCheckNames Global Expression "DoBlock4" [bind, bind_, name "f"])
 
 testDeclaration
   :: Spec
 testDeclaration
   = describe "declarations"
   $ it "checks type signatures (TypeSig)"
-    (testCheckDeclaration "TypeSig" ["g", "h"])
+    (testCheck Global Declaration "TypeSig" ["g", "h"])
   >> it "checks function clauses (FunClause)"
-    (testCheckDeclaration "FunClause" ["z", "f", "snoc"])
+    (testCheck Global Declaration "FunClause" ["z", "f", "snoc"])
   >> it "checks data signatures (DataSig)"
-    (testCheckDeclaration "DataSig" ["D"])
+    (testCheck Global Declaration "DataSig" ["D"])
   >> it "checks record definitions (RecordDef)"
-    (testCheckDeclaration "RecordDef" ["x"])
+    (testCheck Global Declaration "RecordDef" ["x"])
   >> it "checks syntax declarations (Syntax)"
-    (testCheckDeclaration "Syntax" ["p1", "p1'"])
+    (testCheck Global Declaration "Syntax" ["p1", "p1'"])
   >> it "checks pattern synonyms (PatternSyn)"
-    (testCheckDeclaration "PatternSyn" ["q", "f", "g"])
+    (testCheck Global Declaration "PatternSyn" ["q", "f", "g"])
   >> it "checks macros (Macro)"
-    (testCheckDeclaration "Macro" ["B", "C", "O"])
+    (testCheck Global Declaration "Macro" ["B", "C", "O"])
   >> it "checks postulates (Postulate)"
-    (testCheckDeclaration "Postulate" ["g", "h"])
+    (testCheck Global Declaration "Postulate" ["g", "h"])
   >> it "checks open statements (Open)"
-    (testCheckDeclaration "Open" ["N", "O", "x", "y", "z"])
+    (testCheck Global Declaration "Open" ["N", "O", "x", "y", "z"])
 
 -- ## Main
 

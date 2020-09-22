@@ -1168,23 +1168,25 @@ checkNiceDeclaration _ c
   >>= pure . fromContext (importDirectiveAccess i)
 checkNiceDeclaration _ c
   (NiceModuleMacro r _ a
-    (SectionApp _ [] (RawApp _ (Ident n : es))) DontOpen i)
+    (SectionApp _ bs (RawApp _ (Ident n : es))) DontOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a)) (fromName a)
   >>= \a' -> liftLookup r n' (accessContextLookupModule n' c)
-  >>= \c' -> checkExprs c es
+  >>= \c' -> checkTypedBindings True c bs
+  >>= \c'' -> checkExprs (c <> c'') es
   >> checkImportDirective Macro r (QName a') c' i
-  >>= \c'' -> pure (accessContextModule a' Public c'')
+  >>= \c''' -> pure (accessContextModule a' Public c''')
 checkNiceDeclaration _ c
   (NiceModuleMacro r _ a
-    (SectionApp _ [] (RawApp _ (Ident n : es))) DoOpen i)
+    (SectionApp _ bs (RawApp _ (Ident n : es))) DoOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a)) (fromName a)
   >>= \a' -> liftLookup r n' (accessContextLookupModule n' c)
-  >>= \c' -> checkExprs c es
+  >>= \c' -> checkTypedBindings True c bs
+  >>= \c'' -> checkExprs (c <> c'') es
   >> checkImportDirective Macro r (QName a') c' i
-  >>= \c'' -> pure (accessContextModule a' Public c''
-    <> fromContext (importDirectiveAccess i) c'')
+  >>= \c''' -> pure (accessContextModule a' Public c'''
+    <> fromContext (importDirectiveAccess i) c''')
 checkNiceDeclaration _ _
   (NiceModuleMacro _ _ _
     (SectionApp r _ _) _ _)

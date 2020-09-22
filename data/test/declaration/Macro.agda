@@ -1,5 +1,12 @@
 module Macro where
 
+data ⊤
+  : Set
+  where
+
+  tt
+    : ⊤
+
 module M where
 
   postulate
@@ -8,6 +15,7 @@ module M where
       : Set
 
 module N
+  (x : ⊤)
   = M
   using (A)
 
@@ -19,7 +27,8 @@ module O
   )
 
 C
-  : Set
+  : ⊤
+  → Set
 C
   = N.A
 

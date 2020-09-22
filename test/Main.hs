@@ -218,8 +218,8 @@ testDeclaration
   >> it "checks pattern synonyms (PatternSyn)"
     (testCheck Global Declaration "PatternSyn" ["q", "f", "g"])
   >> it "checks macros (Macro)"
-    (testCheck Global Declaration "Macro" ["B", "C", "O"]
-    >> testCheck Local Declaration "Macro" [])
+    (testCheck Global Declaration "Macro" ["B", "C", "O", "x"]
+    >> testCheck Local Declaration "Macro" ["x"])
   >> it "checks postulates (Postulate)"
     (testCheck Global Declaration "Postulate" ["g", "h"])
   >> it "checks open statements (Open)"

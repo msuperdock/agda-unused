@@ -9,6 +9,8 @@ module Agda.Unused.Types.Context
   ( -- * Definitions
 
     Item
+  , Module(Module)
+  , AccessModule(AccessModule)
   , Context
   , AccessContext
   , accessContextUnion
@@ -48,6 +50,7 @@ module Agda.Unused.Types.Context
 
     -- ** Ranges
 
+  , moduleRanges
   , contextRanges
 
     -- ** Match
@@ -158,13 +161,37 @@ data AccessItem where
 
   deriving Show
 
+-- | The data associated with a module in context. This includes:
+--
+-- - A list of ranges associated with the module, which includes the site of the
+-- original definition, as well as any relevant @import@ or @open@ statements.
+-- - The inner context of the module.
+data Module
+  = Module
+  { moduleRanges'
+    :: ![Range]
+  , moduleContext
+    :: !Context
+  } deriving Show
+
+-- Like 'Module', but also recording whether the module is public or private.
+data AccessModule
+  = AccessModule
+  { accessModuleAccess
+    :: !Access
+  , accessModuleRanges
+    :: ![Range]
+  , accessModuleContext
+    :: !Context
+  } deriving Show
+
 -- | A namespace of definitions. Any Agda module produces a 'Context'.
 data Context
   = Context
   { contextItems
     :: !(Map Name Item)
   , contextModules
-    :: !(Map Name Context)
+    :: !(Map Name Module)
   } deriving Show
 
 -- | A namespace of definitions, which may be public or private. Any collection
@@ -174,7 +201,7 @@ data AccessContext
   { accessContextItems
     :: !(Map Name AccessItem)
   , accessContextModules
-    :: !(Map Name (Access, Context))
+    :: !(Map Name AccessModule)
   , accessContextImports
     :: !(Map QName Context)
   } deriving Show
@@ -219,13 +246,13 @@ accessItemUnion i1 i2
 
 -- Ensure public names are not shadowed by private names.
 accessModuleUnion
-  :: (Access, Context)
-  -> (Access, Context)
-  -> (Access, Context)
-accessModuleUnion c1@(Public, _) (Private, _)
-  = c1
-accessModuleUnion _ c2
-  = c2
+  :: AccessModule
+  -> AccessModule
+  -> AccessModule
+accessModuleUnion m1@(AccessModule Public _ _) (AccessModule Private _ _)
+  = m1
+accessModuleUnion _ m2
+  = m2
 
 -- | Like '(<>)', but public items take precedence over private items. This is
 -- important when combining contexts from successive declarations; for example:
@@ -286,15 +313,15 @@ contextLookup
 contextLookup n c
   = itemRanges <$> contextLookupItem n c
 
--- | Get the inner context for the given name, or 'Nothing' if not in context.
+-- | Get the inner module for the given name, or 'Nothing' if not in context.
 contextLookupModule
   :: QName
   -> Context
-  -> Maybe Context
+  -> Maybe Module
 contextLookupModule (QName n) (Context _ ms)
   = Map.lookup n ms
 contextLookupModule (Qual n ns) (Context _ ms)
-  = Map.lookup n ms >>= contextLookupModule ns
+  = Map.lookup n ms >>= contextLookupModule ns . moduleContext
 
 -- | Get the item for the given name, or 'Nothing' if not in context.
 contextLookupItem
@@ -304,7 +331,7 @@ contextLookupItem
 contextLookupItem (QName n) (Context is _)
   = Map.lookup n is
 contextLookupItem (Qual n ns) (Context _ ms)
-  = Map.lookup n ms >>= contextLookupItem ns
+  = Map.lookup n ms >>= contextLookupItem ns . moduleContext
 
 -- | Get the ranges for the given name, or produce a 'LookupError'.
 accessContextLookup
@@ -315,11 +342,11 @@ accessContextLookup n c@(AccessContext _ _ is)
   = contextLookup n (toContext' c)
   <|> Map.mapWithKey (accessContextLookupImport n) is
 
--- | Get the inner context for the given name, or produce a 'LookupError'.
+-- | Get the inner module for the given name, or produce a 'LookupError'.
 accessContextLookupModule
   :: QName
   -> AccessContext
-  -> Either LookupError Context
+  -> Either LookupError Module
 accessContextLookupModule n c@(AccessContext _ _ is)
   = contextLookupModule n (toContext' c)
   <|> Map.mapWithKey (accessContextLookupModuleImport n) is
@@ -336,9 +363,9 @@ accessContextLookupModuleImport
   :: QName
   -> QName
   -> Context
-  -> Maybe Context
+  -> Maybe Module
 accessContextLookupModuleImport n i c | n == i
-  = Just c
+  = Just (Module [] c)
 accessContextLookupModuleImport n i c
   = stripPrefix i n >>= flip contextLookupModule c
 
@@ -429,7 +456,7 @@ contextInsertRangeModule
   -> Context
   -> Context
 contextInsertRangeModule n r (Context is ms)
-  = Context is (Map.adjust (contextInsertRangeAll r) n ms)
+  = Context is (Map.adjust (moduleInsertRangeAll r) n ms)
 
 -- | Insert a range for all names in context.
 contextInsertRangeAll
@@ -437,7 +464,14 @@ contextInsertRangeAll
   -> Context
   -> Context
 contextInsertRangeAll r (Context is ms)
-  = Context (itemInsertRange r <$> is) (contextInsertRangeAll r <$> ms)
+  = Context (itemInsertRange r <$> is) (moduleInsertRangeAll r <$> ms)
+
+moduleInsertRangeAll
+  :: Range
+  -> Module
+  -> Module
+moduleInsertRangeAll r (Module rs c)
+  = Module (r : rs) (contextInsertRangeAll r c)
 
 -- ### Delete
 
@@ -513,13 +547,21 @@ accessItemRanges
 accessItemRanges
   = itemRanges . toItem'
 
+-- | Get all ranges associated with names in the given module, including ranges
+-- associated with the module itself.
+moduleRanges
+  :: Module
+  -> [Range]
+moduleRanges (Module rs c)
+  = rs <> contextRanges c
+
 -- | Get all ranges associated with names in the given context.
 contextRanges
   :: Context
   -> [Range]
 contextRanges (Context is ms)
   = concat (itemRanges <$> Map.elems is)
-  <> concat (contextRanges <$> Map.elems ms)
+  <> concat (moduleRanges <$> Map.elems ms)
 
 -- ### Match
 
@@ -570,10 +612,10 @@ contextItem n i
 -- | Construct a 'Context' with a single module.
 contextModule
   :: Name
+  -> Module
   -> Context
-  -> Context
-contextModule n c
-  = Context mempty (Map.singleton n c)
+contextModule n m
+  = Context mempty (Map.singleton n m)
 
 -- | Construct an 'AccessContext' with a single item, along with the relevant
 -- syntax item if applicable.
@@ -585,29 +627,29 @@ accessContextItem
 accessContextItem n a i
   = fromContext a (contextItem n i)
 
--- | Construct an 'AccessContext' with a single module.
+-- | Construct an 'AccessContext' with a single access module.
 accessContextModule
   :: Name
-  -> Access
-  -> Context
+  -> AccessModule
   -> AccessContext
-accessContextModule n a c
-  = fromContext a (contextModule n c)
+accessContextModule n m
+  = AccessContext mempty (Map.singleton n m) mempty
 
--- | Like 'accessContextModule', but first convert the given access context to
--- an ordinary context using 'toContext':
+-- | Like 'accessContextModule', but taking an access context. We convert the
+-- given access context to an ordinary context using 'toContext':
 --
 -- @
--- accessContextModule' n a
---   = accessContextModule n a . toContext
+-- accessContextModule' n a rs c
+--   = accessContextModule n (AccessModule a rs (toContext c))
 -- @
 accessContextModule'
   :: Name
   -> Access
+  -> [Range]
   -> AccessContext
   -> AccessContext
-accessContextModule' n a
-  = accessContextModule n a . toContext
+accessContextModule' n a rs c
+  = accessContextModule n (AccessModule a rs (toContext c))
 
 -- | Construct an access context with a single import.
 accessContextImport
@@ -666,13 +708,26 @@ toItem' (AccessItemSyntax _ rs)
 toItem' (AccessItem _ _ rs s)
   = Item rs s
 
+fromModule
+  :: Access
+  -> Module
+  -> AccessModule
+fromModule a (Module rs c)
+  = AccessModule a rs c
+
 toModule
-  :: (Access, Context)
-  -> Maybe Context
-toModule (Private, _)
+  :: AccessModule
+  -> Maybe Module
+toModule (AccessModule Private _ _)
   = Nothing
-toModule (Public, c)
-  = Just c
+toModule (AccessModule Public rs c)
+  = Just (Module rs c)
+
+toModule'
+  :: AccessModule
+  -> Module
+toModule' (AccessModule _ rs c)
+  = Module rs c
 
 -- | Convert a 'Context' to 'AccessContext'. Give all items the given access.
 fromContext
@@ -682,7 +737,7 @@ fromContext
 fromContext a (Context is ms)
   = AccessContext
     (Map.map (fromItem a) is <> Map.fromList (Map.elems is >>= fromItemSyntax))
-    (Map.map ((,) a) ms)
+    (Map.map (fromModule a) ms)
     mempty
 
 -- | Convert an 'AccessContext' to 'Context'. Discard private items and imports.
@@ -697,5 +752,5 @@ toContext'
   :: AccessContext
   -> Context
 toContext' (AccessContext is ms _)
-  = Context (Map.map toItem' is) (Map.map snd ms)
+  = Context (Map.map toItem' is) (Map.map toModule' ms)
 

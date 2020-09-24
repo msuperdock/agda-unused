@@ -40,10 +40,10 @@ data RangeType where
   RangeImportItem
     :: RangeType
 
-  RangeMacro
+  RangeModule
     :: RangeType
 
-  RangeMacroItem
+  RangeModuleItem
     :: RangeType
 
   RangeOpen

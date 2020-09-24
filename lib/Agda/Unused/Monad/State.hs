@@ -66,10 +66,10 @@ data ModuleState where
 -- | The current computation state.
 data State
   = State
-  { _stateItems
+  { stateItems'
     :: !(Map Range RangeInfo)
     -- ^ Ranges for each unused item.
-  , _stateModules
+  , stateModules'
     :: !(Map QName ModuleState)
     -- ^ States for each module dependency.
   } deriving Show
@@ -90,7 +90,7 @@ stateItems
 stateItems
   = stateItemsFilter
   . Map.toAscList
-  . _stateItems
+  . stateItems'
 
 -- | Get a list of visited modules.
 stateModules
@@ -98,7 +98,7 @@ stateModules
   -> [QName]
 stateModules
   = Map.keys
-  . _stateModules
+  . stateModules'
 
 -- Remove nested items.
 stateItemsFilter

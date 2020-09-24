@@ -215,13 +215,15 @@ testDeclaration
     (testCheck Global Declaration "Syntax" ["p1", "p1'"])
   >> it "checks pattern synonyms (PatternSyn)"
     (testCheck Global Declaration "PatternSyn" ["q", "f", "g"])
-  >> it "checks macros (Macro)"
-    (testCheck Global Declaration "Macro" ["C", "O", "x"]
-    >> testCheck Local Declaration "Macro" ["x"])
   >> it "checks postulates (Postulate)"
     (testCheck Global Declaration "Postulate" ["g", "h"])
   >> it "checks open statements (Open)"
     (testCheck Global Declaration "Open" ["N", "O", "x", "y"])
+  >> it "checks module macros (ModuleMacro)"
+    (testCheck Global Declaration "ModuleMacro" ["C", "Q", "S", "x", "y"]
+    >> testCheck Local Declaration "ModuleMacro" ["x"])
+  >> it "checks module definitions (Module)"
+    (testCheck Global Declaration "Module" ["O", "P", "x"])
 
 -- ## Main
 

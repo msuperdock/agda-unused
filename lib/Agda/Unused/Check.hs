@@ -21,14 +21,14 @@ import Agda.Unused.Monad.State
 import Agda.Unused.Types.Access
   (Access(..), fromAccess)
 import Agda.Unused.Types.Context
-  (AccessContext, Context, LookupError(..), accessContextDefine,
-    accessContextImport, accessContextItem, accessContextLookup,
-    accessContextLookupDefining, accessContextLookupModule,
+  (AccessContext, AccessModule(..), Context, LookupError(..),
+    accessContextDefine, accessContextImport, accessContextItem,
+    accessContextLookup, accessContextLookupDefining, accessContextLookupModule,
     accessContextLookupSpecial, accessContextMatch, accessContextModule,
     accessContextModule', accessContextUnion, contextDelete,
     contextDeleteModule, contextItem, contextLookup, contextLookupItem,
     contextLookupModule, contextModule, contextRanges, fromContext, item,
-    itemConstructor, itemPattern, toContext)
+    itemConstructor, itemPattern, moduleRanges, toContext)
 import qualified Agda.Unused.Types.Context
   as C
 import Agda.Unused.Types.Name
@@ -324,6 +324,19 @@ checkQName a t r (QName n)
   = checkName False mempty a t r n
 checkQName _ _ _ (Qual _ _)
   = pure mempty
+
+checkModuleName
+  :: MonadReader Environment m
+  => MonadState State m
+  => Context
+  -> Access
+  -> Range
+  -> Name
+  -> m AccessContext
+checkModuleName c a r n
+  = modifyInsert r (RangeInfo RangeModule (QName n))
+  >> contextInsertRangeAll r c
+  >>= \c' -> pure (accessContextModule n (AccessModule a [r] c'))
 
 touchName
   :: MonadReader Environment m
@@ -943,7 +956,8 @@ checkWhereClause c (AnyWhere ds)
 checkWhereClause c (SomeWhere n a ds)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> checkDeclarations c ds
-  >>= \c' -> pure (accessContextModule' n' (fromAccess a) c', c')
+  >>= \c' -> checkModuleName (toContext c') (fromAccess a) (getRange n) n'
+  >>= \c'' -> pure (c'' , c')
 
 checkRewriteEqn
   :: MonadError Error m
@@ -1135,8 +1149,8 @@ checkNiceDeclaration fs c (PrimitiveFunction _ a _ n e)
   = checkExpr c e >> checkName' False fs (fromAccess a) RangeDefinition n
 checkNiceDeclaration fs c (NiceMutual _ _ _ _ ds)
   = checkNiceDeclarations fs c ds
-checkNiceDeclaration _ c (NiceModule _ a _ (N.QName n) bs ds)
-  = checkNiceModule c (fromAccess a) (fromName n) bs ds
+checkNiceDeclaration _ c (NiceModule r a _ (N.QName n) bs ds)
+  = checkNiceModule c (fromAccess a) r (fromName n) bs ds
 checkNiceDeclaration _ _ (NiceModule _ _ _ n@(N.Qual _ _) _ _)
   = throwError (ErrorInternal ErrorName (getRange n))
 checkNiceDeclaration _ _ (NicePragma _ _)
@@ -1163,30 +1177,33 @@ checkNiceDeclaration _ c
     (SectionApp _ [] (RawApp _ (Ident n : es))) DoOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> liftLookup r n' (accessContextLookupModule n' c)
-  >>= \c' -> checkExprs c es
+  >>= \(C.Module rs c') -> modifyDelete rs
+  >> checkExprs c es
   >> checkImportDirective Open r n' c' i
   >>= pure . fromContext (importDirectiveAccess i)
 checkNiceDeclaration _ c
-  (NiceModuleMacro r _ a
+  (NiceModuleMacro r a a'
     (SectionApp _ bs (RawApp _ (Ident n : es))) DontOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
-  >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a)) (fromName a)
-  >>= \a' -> liftLookup r n' (accessContextLookupModule n' c)
-  >>= \c' -> checkTypedBindings True c bs
+  >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a')) (fromName a')
+  >>= \a'' -> liftLookup r n' (accessContextLookupModule n' c)
+  >>= \(C.Module rs c') -> modifyDelete rs
+  >> checkTypedBindings True c bs
   >>= \c'' -> checkExprs (c <> c'') es
-  >> checkImportDirective Macro r (QName a') c' i
-  >>= \c''' -> pure (accessContextModule a' Public c''')
+  >> checkImportDirective Module r (QName a'') c' i
+  >>= \c''' -> checkModuleName c''' (fromAccess a) r a''
 checkNiceDeclaration _ c
-  (NiceModuleMacro r _ a
+  (NiceModuleMacro r a a'
     (SectionApp _ bs (RawApp _ (Ident n : es))) DoOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
-  >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a)) (fromName a)
-  >>= \a' -> liftLookup r n' (accessContextLookupModule n' c)
-  >>= \c' -> checkTypedBindings True c bs
+  >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a')) (fromName a')
+  >>= \a'' -> liftLookup r n' (accessContextLookupModule n' c)
+  >>= \(C.Module rs c') -> modifyDelete rs
+  >> checkTypedBindings True c bs
   >>= \c'' -> checkExprs (c <> c'') es
-  >> checkImportDirective Macro r (QName a') c' i
-  >>= \c''' -> pure (accessContextModule a' Public c'''
-    <> fromContext (importDirectiveAccess i) c''')
+  >> checkImportDirective Module r (QName a'') c' i
+  >>= \c''' -> checkModuleName c''' (fromAccess a) r a''
+  >>= \c'''' -> pure (c'''' <> fromContext (importDirectiveAccess i) c''')
 checkNiceDeclaration _ _
   (NiceModuleMacro _ _ _
     (SectionApp r _ _) _ _)
@@ -1199,7 +1216,8 @@ checkNiceDeclaration _ _
 checkNiceDeclaration _ c (NiceOpen r n i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> liftLookup r n' (accessContextLookupModule n' c)
-  >>= \c' -> checkImportDirective Open r n' c' i
+  >>= \(C.Module rs c') -> modifyDelete rs
+  >> checkImportDirective Open r n' c' i
   >>= \c'' -> pure (fromContext (importDirectiveAccess i) c'')
 
 checkNiceDeclaration _ _ (NiceImport r n Nothing DontOpen i)
@@ -1218,21 +1236,21 @@ checkNiceDeclaration _ _ (NiceImport r n (Just a) DontOpen i)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a)) (fromAsName a)
   >>= \a' -> checkFile (Just r) n'
   >>= \c' -> checkImportDirective Import r n' c' i
-  >>= \c'' -> pure (accessContextModule a' Public c'')
+  >>= \c'' -> checkModuleName c'' Public (getRange a) a'
 checkNiceDeclaration _ _ (NiceImport r n (Just a) DoOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a)) (fromAsName a)
   >>= \a' -> checkFile (Just r) n'
   >>= \c' -> checkImportDirective Import r n' c' i
-  >>= \c'' -> pure (accessContextModule a' Public c''
-    <> fromContext (importDirectiveAccess i) c'')
+  >>= \c'' -> checkModuleName c' Public (getRange a) a'
+  >>= \c''' -> pure (c''' <> fromContext (importDirectiveAccess i) c'')
 
 checkNiceDeclaration fs c (NiceDataDef _ _ _ _ _ n bs cs)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> pure (either (const []) id (accessContextLookup (QName n') c))
   >>= \rs -> checkLamBindings False c bs
   >>= \c' -> checkNiceConstructors fs rs (accessContextDefine n' c <> c') cs
-  >>= \c'' -> pure (accessContextModule' n' Public c'' <> c'')
+  >>= \c'' -> pure (accessContextModule' n' Public rs c'' <> c'')
 
 checkNiceDeclaration fs c (NiceRecDef _ _ _ _ _ n _ _ m bs ds)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
@@ -1240,7 +1258,7 @@ checkNiceDeclaration fs c (NiceRecDef _ _ _ _ _ n _ _ m bs ds)
   >>= \rs -> checkLamBindings False c bs
   >>= \c' -> checkNiceConstructorRecordMay fs rs (m >>= fromNameRange . fst)
   >>= \c'' -> checkDeclarationsRecord n' rs (c <> c') ds
-  >>= \c''' -> pure (accessContextModule' n' Public (c'' <> c''') <> c'')
+  >>= \c''' -> pure (accessContextModule' n' Public rs (c'' <> c''') <> c'')
 
 checkNiceDeclaration fs c (NicePatternSyn _ a n ns p)
   = localSkip (checkNames' False Public RangeVariable (unArg <$> ns))
@@ -1344,8 +1362,8 @@ checkNiceDeclarationsTop
   -> m AccessContext
 checkNiceDeclarationsTop _ _ []
   = pure mempty
-checkNiceDeclarationsTop _ c (NiceModule _ a _ _ bs ds : _)
-  = checkNiceModule c (fromAccess a) Nothing bs ds
+checkNiceDeclarationsTop _ c (NiceModule r a _ _ bs ds : _)
+  = checkNiceModule c (fromAccess a) r Nothing bs ds
 checkNiceDeclarationsTop fs c (d : ds)
   = checkNiceDeclaration fs c d
   >>= \c' -> checkNiceDeclarations fs (c <> c') ds
@@ -1436,15 +1454,17 @@ checkNiceModule
   => MonadIO m
   => AccessContext
   -> Access
+  -> Range
   -> Maybe Name
   -- ^ If `Nothing`, the module is anonymous.
   -> [TypedBinding]
   -> [Declaration]
   -> m AccessContext
-checkNiceModule c a n bs ds
+checkNiceModule c a r n bs ds
   = checkTypedBindings True c bs
   >>= \c' -> checkDeclarations (c <> c') ds
-  >>= pure . maybe (fromContext a) (flip accessContextModule a) n . toContext
+  >>= \c'' -> pure (toContext c'')
+  >>= \c''' -> maybe (pure (fromContext a c''')) (checkModuleName c''' a r) n
 
 -- ## Imports
 
@@ -1453,7 +1473,7 @@ data DirectiveType where
   Import
     :: DirectiveType
 
-  Macro
+  Module
     :: DirectiveType
 
   Open
@@ -1463,21 +1483,21 @@ data DirectiveType where
 
 directiveStatement
   :: DirectiveType
-  -> RangeType
+  -> Maybe RangeType
 directiveStatement Import
-  = RangeImport
-directiveStatement Macro
-  = RangeMacro
+  = Just RangeImport
+directiveStatement Module
+  = Nothing
 directiveStatement Open
-  = RangeOpen
+  = Just RangeOpen
 
 directiveItem
   :: DirectiveType
   -> RangeType
 directiveItem Import
   = RangeImportItem
-directiveItem Macro
-  = RangeMacroItem
+directiveItem Module
+  = RangeModuleItem
 directiveItem Open
   = RangeOpenItem
 
@@ -1492,12 +1512,14 @@ checkImportDirective
   -> ImportDirective
   -> m Context
 checkImportDirective dt r n c (ImportDirective _ UseEverything hs rs _)
-  = modifyInsert r (RangeInfo (directiveStatement dt) n)
+  = maybe (pure ()) (\t -> modifyInsert r (RangeInfo t n))
+    (directiveStatement dt)
   >> modifyHidings c hs
   >>= flip (modifyRenamings dt) rs
   >>= contextInsertRangeAll r
 checkImportDirective dt r n c (ImportDirective _ (Using ns) _ rs _)
-  = modifyInsert r (RangeInfo (directiveStatement dt) n)
+  = maybe (pure ()) (\t -> modifyInsert r (RangeInfo t n))
+    (directiveStatement dt)
   >> checkImportedNames dt c ns
   >>= \c' -> checkRenamings dt c rs
   >>= \c'' -> contextInsertRangeAll r (c' <> c'')
@@ -1638,7 +1660,7 @@ touchModuleWith
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
-  => Either LookupError Context
+  => Either LookupError C.Module
   -> Range
   -> QName
   -> m ()
@@ -1646,8 +1668,8 @@ touchModuleWith (Left LookupNotFound) _ _
   = pure ()
 touchModuleWith (Left LookupAmbiguous) r n
   = throwError (ErrorAmbiguous r n)
-touchModuleWith (Right c) _ _
-  = touchContext c
+touchModuleWith (Right m) _ _
+  = modifyDelete (moduleRanges m)
 
 touchContext
   :: MonadReader Environment m

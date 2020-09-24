@@ -262,9 +262,9 @@ printRangeType RangeImport
   = "import"
 printRangeType RangeImportItem
   = "imported item"
-printRangeType RangeMacro
-  = "module assignment"
-printRangeType RangeMacroItem
+printRangeType RangeModule
+  = "module"
+printRangeType RangeModuleItem
   = "module assignment item"
 printRangeType RangeOpen
   = "open"

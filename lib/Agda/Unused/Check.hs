@@ -125,6 +125,15 @@ contextInsertRangeAll
 contextInsertRangeAll r c
   = askSkip >>= pure . bool (C.contextInsertRangeAll r c) c
 
+-- Do nothing if `askSkip` returns true.
+accessContextInsertRangeAll
+  :: MonadReader Environment m
+  => Range
+  -> AccessContext
+  -> m AccessContext
+accessContextInsertRangeAll r c
+  = askSkip >>= pure . bool (C.accessContextInsertRangeAll r c) c
+
 -- Also insert range unless `askSkip` returns true.
 contextRename
   :: MonadReader Environment m
@@ -1147,8 +1156,6 @@ checkNiceDeclaration _ _ (NiceField r _ _ _ _ _ _)
   = throwError (ErrorInternal (ErrorUnexpected UnexpectedField) r)
 checkNiceDeclaration fs c (PrimitiveFunction _ a _ n e)
   = checkExpr c e >> checkName' False fs (fromAccess a) RangeDefinition n
-checkNiceDeclaration fs c (NiceMutual _ _ _ _ ds)
-  = checkNiceDeclarations fs c ds
 checkNiceDeclaration _ c (NiceModule r a _ (N.QName n) bs ds)
   = checkNiceModule c (fromAccess a) r (fromName n) bs ds
 checkNiceDeclaration _ _ (NiceModule _ _ _ n@(N.Qual _ _) _ _)
@@ -1171,6 +1178,23 @@ checkNiceDeclaration _ _ (NiceUnquoteDecl r _ _ _ _ _ _ _)
   = throwError (ErrorUnsupported UnsupportedUnquote r)
 checkNiceDeclaration _ _ (NiceUnquoteDef r _ _ _ _ _ _)
   = throwError (ErrorUnsupported UnsupportedUnquote r)
+
+checkNiceDeclaration fs c
+  (NiceMutual _ _ _ _
+    ds@(NiceRecSig _ _ _ _ _ _ _ _ : NiceRecDef _ _ _ _ _ _ _ _ _ _ _ : _))
+  = checkNiceDeclarations fs c ds
+checkNiceDeclaration fs c
+  (NiceMutual _ _ _ _
+    ds@(NiceDataSig _ _ _ _ _ _ _ _ : NiceDataDef _ _ _ _ _ _ _ _ : _))
+  = checkNiceDeclarations fs c ds
+checkNiceDeclaration fs c
+  (NiceMutual _ _ _ _
+    ds@(FunSig _ _ _ _ _ _ _ _ _ _ : FunDef _ _ _ _ _ _ _ _ : _))
+  = checkNiceDeclarations fs c ds
+checkNiceDeclaration fs c (NiceMutual r _ _ _ ds)
+  = checkNiceDeclarations fs c ds
+  >>= \c' -> modifyInsert r RangeMutual
+  >> accessContextInsertRangeAll r c'
 
 checkNiceDeclaration _ c
   (NiceModuleMacro r _ (N.NoName _ _)

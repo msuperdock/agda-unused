@@ -33,6 +33,7 @@ module Agda.Unused.Types.Context
   , contextInsertRange
   , contextInsertRangeModule
   , contextInsertRangeAll
+  , accessContextInsertRangeAll
 
     -- ** Delete
 
@@ -440,6 +441,19 @@ itemInsertRange r (ItemPattern rs s)
 itemInsertRange r (Item rs s)
   = Item (r : rs) s
 
+accessItemInsertRange
+  :: Range
+  -> AccessItem
+  -> AccessItem
+accessItemInsertRange r (AccessItemConstructor rs1 rs2 ns1 ns2)
+  = AccessItemConstructor (r : rs1) (r : rs2) ns1 ns2
+accessItemInsertRange r (AccessItemPattern a rs n)
+  = AccessItemPattern a (r : rs) n
+accessItemInsertRange r (AccessItemSyntax b rs)
+  = AccessItemSyntax b (r : rs)
+accessItemInsertRange r (AccessItem b a rs n)
+  = AccessItem b a (r : rs) n
+
 -- | Insert a range for the given name, if present.
 contextInsertRange
   :: Name
@@ -458,20 +472,39 @@ contextInsertRangeModule
 contextInsertRangeModule n r (Context is ms)
   = Context is (Map.adjust (moduleInsertRangeAll r) n ms)
 
--- | Insert a range for all names in context.
-contextInsertRangeAll
-  :: Range
-  -> Context
-  -> Context
-contextInsertRangeAll r (Context is ms)
-  = Context (itemInsertRange r <$> is) (moduleInsertRangeAll r <$> ms)
-
 moduleInsertRangeAll
   :: Range
   -> Module
   -> Module
 moduleInsertRangeAll r (Module rs c)
   = Module (r : rs) (contextInsertRangeAll r c)
+
+accessModuleInsertRangeAll
+  :: Range
+  -> AccessModule
+  -> AccessModule
+accessModuleInsertRangeAll r (AccessModule a rs c)
+  = AccessModule a (r : rs) (contextInsertRangeAll r c)
+
+-- | Insert a range for all names in a context.
+contextInsertRangeAll
+  :: Range
+  -> Context
+  -> Context
+contextInsertRangeAll r (Context is ms)
+  = Context
+    (itemInsertRange r <$> is)
+    (moduleInsertRangeAll r <$> ms)
+
+-- | Insert a range for all names in an access context.
+accessContextInsertRangeAll
+  :: Range
+  -> AccessContext
+  -> AccessContext
+accessContextInsertRangeAll r (AccessContext is ms js)
+  = AccessContext
+    (accessItemInsertRange r <$> is)
+    (accessModuleInsertRangeAll r <$> ms) js
 
 -- ### Delete
 

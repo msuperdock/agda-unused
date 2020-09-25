@@ -25,7 +25,9 @@ import Agda.Unused.Types.Name
 import Agda.Syntax.Position
   (PositionWithoutFile, Range, Range'(..), getRange, rEnd', rStart')
 
--- | The type of item found at a range.
+-- ## Definitions
+
+-- | The type of item found at a named range.
 data RangeType where
 
   RangeData
@@ -64,18 +66,22 @@ data RangeType where
   RangeVariable
     :: RangeType
 
-  deriving Show
+  deriving (Eq, Ord, Show)
 
 -- | Information associated with an item found at a certain range.
-data RangeInfo
-  = RangeInfo
-  { rangeType
+data RangeInfo where
+
+  RangeInfo
     :: !RangeType
-    -- ^ The type of item.
-  , rangeName
-    :: !QName
-    -- ^ The name of the item.
-  } deriving Show
+    -> !QName
+    -> RangeInfo
+
+  RangeMutual
+    :: RangeInfo
+
+  deriving (Eq, Ord, Show)
+
+-- ## Interface
 
 -- | Determine whether the first range contains the second.
 rangeContains

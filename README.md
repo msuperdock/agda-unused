@@ -147,34 +147,3 @@ We currently do not support code containing
 (other than Agda's built-in libraries). `agda-unused` will produce an error if
 your code uses these language features.
 
-### Mutual recursion
-
-For ordinary recursion, we consider an identifier unused if it only appears in
-its own definition, but we have no such special handling for mutual recursion.
-For example, consider the following code:
-
-```
-f
-  : ℕ
-  → ℕ
-
-g
-  : ℕ
-  → ℕ
-
-f zero
-  = zero
-f (suc n)
-  = g n
-
-g zero
-  = zero
-g (suc n)
-  = f n
-```
-
-After checking this code, `g` and `h` are both considered used.
-
-Fixing this issue will require a graph of dependencies for each block of
-mutually recursive code.
-

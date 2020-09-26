@@ -175,7 +175,7 @@ data Module
     :: !Context
   } deriving Show
 
--- Like 'Module', but also recording whether the module is public or private.
+-- | Like 'Module', but also recording whether the module is public or private.
 data AccessModule
   = AccessModule
   { accessModuleAccess

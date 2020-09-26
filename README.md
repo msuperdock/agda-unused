@@ -141,9 +141,12 @@ The `"none"` type indicates that there is no unused code.
 
 ### Unsupported language features
 
-We currently do not support code containing
-[unquoting declarations](https://agda.readthedocs.io/en/v2.6.1/language/reflection.html#id3) or
-[external libraries](https://agda.readthedocs.io/en/v2.6.1/tools/package-system.html)
-(other than Agda's built-in libraries). `agda-unused` will produce an error if
-your code uses these language features.
+We currently do not support the following Agda features:
+
+- [record module instance applications](https://agda.readthedocs.io/en/v2.6.1.1/language/module-system.html#parameterised-modules)
+- [unquoting declarations](https://agda.readthedocs.io/en/v2.6.1.1/language/reflection.html#id3)
+- [external libraries](https://agda.readthedocs.io/en/v2.6.1.1/tools/package-system.html)
+(other than Agda's built-in libraries)
+
+`agda-unused` will produce an error if your code uses these language features.
 

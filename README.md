@@ -139,8 +139,6 @@ The `"none"` type indicates that there is no unused code.
 
 ## Limitations
 
-### Unsupported language features
-
 We currently do not support the following Agda features:
 
 - [record module instance applications](https://agda.readthedocs.io/en/v2.6.1.1/language/module-system.html#parameterised-modules)

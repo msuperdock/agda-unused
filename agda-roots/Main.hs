@@ -116,7 +116,7 @@ printRoots
   -> [Root]
   -> IO ()
 printRoots p rs
-  = I.putStrLn (T.unlines (printRoot p <$> rs)) >> exitSuccess
+  = I.putStrLn (T.intercalate "\n" (printRoot p <$> rs)) >> exitSuccess
 
 printRoot
   :: FilePath

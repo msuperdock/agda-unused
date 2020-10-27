@@ -14,7 +14,7 @@ mkDerivation {
   executableHaskellDepends = [
     aeson base directory filepath mtl optparse-applicative text
   ];
-  testHaskellDepends = [ base containers filepath hspec ];
+  testHaskellDepends = [ base containers filepath hspec text ];
   description = "Check for unused code in an Agda project";
   license = stdenv.lib.licenses.mit;
 }

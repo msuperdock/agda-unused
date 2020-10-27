@@ -15,12 +15,13 @@ maintainer:
 synopsis:
   Check for unused code in an Agda project.
 description:
-  A command-line tool to check for unused code in an Agda project.
+  A tool to check for unused code in an Agda project.
 category:
   Dependent types
 data-files:
   data/**/*.agda
 extra-source-files:
+  CHANGELOG.md
   README.md
 
 source-repository head

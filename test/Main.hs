@@ -6,6 +6,8 @@ import Agda.Unused.Check
   (checkUnused, checkUnusedLocal)
 import Agda.Unused.Monad.Error
   (Error)
+import Agda.Unused.Print
+  (printUnusedItems)
 import Agda.Unused.Types.Access
   (Access(..))
 import Agda.Unused.Types.Name
@@ -21,10 +23,15 @@ import Data.Maybe
   (mapMaybe)
 import qualified Data.Set
   as Set
+import Data.Text
+  (Text)
+import qualified Data.Text
+  as T
 import System.FilePath
   ((</>))
 import Test.Hspec
-  (Expectation, Spec, describe, expectationFailure, hspec, it, shouldBe)
+  (Expectation, Spec, describe, expectationFailure, hspec, it, shouldBe,
+    shouldSatisfy)
 
 import Paths_agda_unused
   (getDataFileName)
@@ -200,6 +207,17 @@ testCheck n = do
     <- testUnused unusedLocal (mapMaybe privateMay (testResult n))
   pure ()
 
+testCheckExample
+  :: Expectation
+testCheckExample = do
+  path
+    <- getDataFileName "data/test/example"
+  unusedLocal
+    <- checkUnusedLocal path (name "Test")
+  _
+    <- testUnusedExample unusedLocal
+  pure ()
+
 testUnused
   :: Either Error UnusedItems
   -> [RangeInfo]
@@ -208,6 +226,27 @@ testUnused (Left _) _
   = expectationFailure ""
 testUnused (Right (UnusedItems is)) rs
   = Set.fromList (snd <$> is) `shouldBe` Set.fromList rs
+
+testUnusedExample
+  :: Either Error UnusedItems
+  -> Expectation
+testUnusedExample (Left _)
+  = expectationFailure ""
+testUnusedExample (Right is)
+  = testUnusedOutput (T.lines <$> printUnusedItems is)
+
+testUnusedOutput
+  :: Maybe [Text]
+  -> Expectation
+testUnusedOutput (Just [t0, t1, t2, t3, t4, t5])
+  = (t0 `shouldSatisfy` T.isSuffixOf (T.pack "/Test.agda:4,23-27"))
+  >> (t1 `shouldBe` T.pack "  unused imported item ‘true’")
+  >> (t2 `shouldSatisfy` T.isSuffixOf (T.pack "/Test.agda:5,1-30"))
+  >> (t3 `shouldBe` T.pack "  unused import ‘Agda.Builtin.Unit’")
+  >> (t4 `shouldSatisfy` T.isSuffixOf (T.pack "/Test.agda:11,9-10"))
+  >> (t5 `shouldBe` T.pack "  unused variable ‘x’")
+testUnusedOutput _
+  = expectationFailure ""
 
 privateMay
   :: (Access, a)
@@ -305,6 +344,9 @@ data DeclarationTest where
   Mutual2
     :: DeclarationTest
 
+  Abstract
+    :: DeclarationTest
+
   Private'
     :: DeclarationTest
 
@@ -384,6 +426,8 @@ testModule (Declaration Mutual1)
   = "Mutual1"
 testModule (Declaration Mutual2)
   = "Mutual2"
+testModule (Declaration Abstract)
+  = "Abstract"
 testModule (Declaration Private')
   = "Private"
 testModule (Declaration Postulate')
@@ -563,6 +607,13 @@ testResult n
       ~: Definition
     ]
 
+  Declaration Abstract ->
+    [ "g"
+      ~: Definition
+    , "h"
+      ~: Definition
+    ]
+
   Declaration Private' ->
     [ private "g"
       ~: Definition
@@ -639,6 +690,7 @@ testAll
   $ testPattern
   >> testExpression
   >> testDeclaration
+  >> testExample
 
 testPattern
   :: Spec
@@ -690,6 +742,8 @@ testDeclaration
   >> it "checks mutual blocks (Mutual)"
     (testCheck (Declaration Mutual1)
     >> testCheck (Declaration Mutual2))
+  >> it "checks abstract blocks (Abstract)"
+    (testCheck (Declaration Abstract))
   >> it "checks private blocks (Private)"
     (testCheck (Declaration Private'))
   >> it "checks postulates (Postulate)"
@@ -702,4 +756,11 @@ testDeclaration
     (testCheck (Declaration ModuleMacro))
   >> it "checks module definitions (Module)"
     (testCheck (Declaration Module'))
+
+testExample
+  :: Spec
+testExample
+  = describe "example"
+  $ it "outputs the text in README.md"
+  $ testCheckExample
 

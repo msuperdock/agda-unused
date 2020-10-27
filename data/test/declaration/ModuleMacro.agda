@@ -13,6 +13,9 @@ module N where
     A
       : Set
 
+    B
+      : Set
+
 module O
   = M
 
@@ -31,7 +34,9 @@ module S
   = N
   renaming
   ( A
-    to B
+    to A'
+  ; B
+    to B'
   )
 
 y
@@ -44,4 +49,9 @@ C
   → Set
 C
   = R.A
+
+D
+  : Set
+D
+  = S.B'
 

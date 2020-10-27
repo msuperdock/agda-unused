@@ -93,6 +93,13 @@ bind_
 bind_
   = QName (Name [Hole, Id ">>", Hole])
 
+agdaBuiltinBool
+  :: QName
+agdaBuiltinBool
+  = Qual (Name [Id "Agda"])
+  $ Qual (Name [Id "Builtin"])
+  $ QName (Name [Id "Bool"])
+
 -- ## Ranges
 
 data RangeType where
@@ -299,6 +306,9 @@ data DeclarationTest where
   Open'
     :: DeclarationTest
 
+  Import'
+    :: DeclarationTest
+
   ModuleMacro
     :: DeclarationTest
 
@@ -370,6 +380,8 @@ testModule (Declaration Postulate)
   = "Postulate"
 testModule (Declaration Open')
   = "Open"
+testModule (Declaration Import')
+  = "Import"
 testModule (Declaration ModuleMacro)
   = "ModuleMacro"
 testModule (Declaration Module')
@@ -505,7 +517,13 @@ testResult n
     ]
 
   Declaration RecordDef ->
-    [ "x"
+    [ "B"
+      ~: Record
+    , "c"
+      ~: RecordConstructor
+    , "x"
+      ~: Definition
+    , "y"
       ~: Definition
     ]
 
@@ -545,11 +563,24 @@ testResult n
   Declaration Open' ->
     [ private "N"
       ~: Open
-    , private "O"
+    , private "P"
       ~: Open
-    , "x"
+    , "Q"
+      ~: Module
+    , private "x'"
+      ~: OpenItem
+    , "v"
       ~: Definition
     , "y"
+      ~: Definition
+    ]
+
+  Declaration Import' ->
+    [ private agdaBuiltinBool
+      ~: Import
+    , private "tt"
+      ~: ImportItem
+    , "A"
       ~: Definition
     ]
 
@@ -558,9 +589,11 @@ testResult n
       ~: Variable
     , "Q"
       ~: Module
-    , "S"
-      ~: Module
+    , "A'"
+      ~: ModuleItem
     , "C"
+      ~: Definition
+    , "D"
       ~: Definition
     , "y"
       ~: Definition
@@ -644,6 +677,8 @@ testDeclaration
     (testCheck (Declaration Postulate))
   >> it "checks open statements (Open)"
     (testCheck (Declaration Open'))
+  >> it "checks import statements (Import)"
+    (testCheck (Declaration Import'))
   >> it "checks module macros (ModuleMacro)"
     (testCheck (Declaration ModuleMacro))
   >> it "checks module definitions (Module)"

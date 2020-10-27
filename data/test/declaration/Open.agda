@@ -13,9 +13,9 @@ module N where
 
   open M
 
-  x
+  v
     : ⊤
-  x
+  v
     = tt
 
 open M
@@ -23,13 +23,37 @@ open N
 
 module O where
 
+  w
+    : ⊤
+  w
+    = tt
+
+  x
+    : ⊤
+  x
+    = tt
+
+module P where
+
+  open O
+    using (w)
+    renaming (x to x')
+
   y
     : ⊤
   y
-    = tt
+    = w
 
-open O renaming
-  ( y
-    to z
-  )
+open P
+
+module Q where
+
+  open O
+    hiding (w)
+    renaming (x to x'')
+
+  z
+    : ⊤
+  z
+    = x''
 

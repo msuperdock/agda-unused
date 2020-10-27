@@ -8,12 +8,29 @@ module M where
   
     constructor
   
-      c
+      a
   
 open M
+
+record B
+  : Set
+  where
+
+record C
+  : Set
+  where
+
+  constructor
+
+    c
 
 x
   : A
 x
-  = c
+  = a
+
+y
+  : C
+y
+  = record {}
 

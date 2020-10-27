@@ -1,4 +1,4 @@
-module DataSig where
+module Data where
 
 data D
   (A : Set)

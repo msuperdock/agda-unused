@@ -282,10 +282,10 @@ data DeclarationTest where
   FunClause
     :: DeclarationTest
 
-  DataSig
+  Data'
     :: DeclarationTest
 
-  RecordDef
+  Record'
     :: DeclarationTest
 
   Syntax
@@ -364,10 +364,10 @@ testModule (Declaration TypeSig)
   = "TypeSig"
 testModule (Declaration FunClause)
   = "FunClause"
-testModule (Declaration DataSig)
-  = "DataSig"
-testModule (Declaration RecordDef)
-  = "RecordDef"
+testModule (Declaration Data')
+  = "Data"
+testModule (Declaration Record')
+  = "Record"
 testModule (Declaration Syntax)
   = "Syntax"
 testModule (Declaration PatternSyn)
@@ -511,12 +511,12 @@ testResult n
       ~: Definition
     ]
 
-  Declaration DataSig ->
+  Declaration Data' ->
     [ "D"
       ~: Data
     ]
 
-  Declaration RecordDef ->
+  Declaration Record' ->
     [ "B"
       ~: Record
     , "c"
@@ -662,10 +662,10 @@ testDeclaration
     (testCheck (Declaration TypeSig))
   >> it "checks function clauses (FunClause)"
     (testCheck (Declaration FunClause))
-  >> it "checks data signatures (DataSig)"
-    (testCheck (Declaration DataSig))
-  >> it "checks record definitions (RecordDef)"
-    (testCheck (Declaration RecordDef))
+  >> it "checks data declarations (Data)"
+    (testCheck (Declaration Data'))
+  >> it "checks record declarations (Record)"
+    (testCheck (Declaration Record'))
   >> it "checks syntax declarations (Syntax)"
     (testCheck (Declaration Syntax))
   >> it "checks pattern synonyms (PatternSyn)"

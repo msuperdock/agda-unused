@@ -274,6 +274,8 @@ printRangeType RangeOpenItem
   = "opened item"
 printRangeType RangePatternSynonym
   = "pattern synonym"
+printRangeType RangePostulate
+  = "postulate"
 printRangeType RangeRecord
   = "record"
 printRangeType RangeRecordConstructor

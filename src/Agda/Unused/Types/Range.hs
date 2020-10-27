@@ -57,6 +57,9 @@ data RangeType where
   RangePatternSynonym
     :: RangeType
 
+  RangePostulate
+    :: RangeType
+
   RangeRecord
     :: RangeType
 

@@ -1151,7 +1151,7 @@ checkNiceDeclaration
   -> m AccessContext
 
 checkNiceDeclaration fs c (Axiom _ a _ _ _ n e)
-  = checkExpr c e >> checkName' False fs (fromAccess a) RangeDefinition n
+  = checkExpr c e >> checkName' False fs (fromAccess a) RangePostulate n
 checkNiceDeclaration _ _ (NiceField r _ _ _ _ _ _)
   = throwError (ErrorInternal (ErrorUnexpected UnexpectedField) r)
 checkNiceDeclaration fs c (PrimitiveFunction _ a _ n e)

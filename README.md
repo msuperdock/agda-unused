@@ -4,6 +4,7 @@
 
 - variables
 - definitions
+- postulates
 - data & record types
 - `import` statements
 - `open` statements

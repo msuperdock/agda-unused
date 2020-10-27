@@ -134,6 +134,9 @@ data RangeType where
   PatternSynonym
     :: RangeType
 
+  Postulate
+    :: RangeType
+
   Record
     :: RangeType
 
@@ -170,6 +173,8 @@ n ~: OpenItem
   = (access n, RangeInfo R.RangeOpenItem (name n))
 n ~: PatternSynonym
   = (access n, RangeInfo R.RangePatternSynonym (name n))
+n ~: Postulate
+  = (access n, RangeInfo R.RangePostulate (name n))
 n ~: Record
   = (access n, RangeInfo R.RangeRecord (name n))
 n ~: RecordConstructor
@@ -300,7 +305,7 @@ data DeclarationTest where
   Mutual2
     :: DeclarationTest
 
-  Postulate
+  Postulate'
     :: DeclarationTest
 
   Open'
@@ -376,7 +381,7 @@ testModule (Declaration Mutual1)
   = "Mutual1"
 testModule (Declaration Mutual2)
   = "Mutual2"
-testModule (Declaration Postulate)
+testModule (Declaration Postulate')
   = "Postulate"
 testModule (Declaration Open')
   = "Open"
@@ -529,9 +534,9 @@ testResult n
 
   Declaration Syntax ->
     [ "p1"
-      ~: Definition
+      ~: Postulate
     , "p1'"
-      ~: Definition
+      ~: Postulate
     ]
 
   Declaration PatternSyn ->
@@ -553,9 +558,9 @@ testResult n
       ~: Definition
     ]
 
-  Declaration Postulate ->
+  Declaration Postulate' ->
     [ "g"
-      ~: Definition
+      ~: Postulate
     , "h"
       ~: Definition
     ]
@@ -674,7 +679,7 @@ testDeclaration
     (testCheck (Declaration Mutual1)
     >> testCheck (Declaration Mutual2))
   >> it "checks postulates (Postulate)"
-    (testCheck (Declaration Postulate))
+    (testCheck (Declaration Postulate'))
   >> it "checks open statements (Open)"
     (testCheck (Declaration Open'))
   >> it "checks import statements (Import)"

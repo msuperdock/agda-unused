@@ -15,7 +15,7 @@ import Agda.Unused.Types.Range
 import qualified Agda.Unused.Types.Range
   as R
 import Agda.Unused.Types.Root
-  (Root(..))
+  (Root(..), Roots(..))
 
 import Data.Maybe
   (mapMaybe)
@@ -179,7 +179,7 @@ testCheck n = do
   path
     <- testPath n
   unused
-    <- checkUnused path [Root (name (testModule n)) (Just [])]
+    <- checkUnused path (Roots [Root (name (testModule n)) (Just [])] [])
   unusedLocal
     <- checkUnusedLocal path (name (testModule n))
   _

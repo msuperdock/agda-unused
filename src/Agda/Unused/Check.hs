@@ -37,7 +37,7 @@ import Agda.Unused.Types.Name
 import Agda.Unused.Types.Range
   (Range'(..), RangeInfo(..), RangeType(..))
 import Agda.Unused.Types.Root
-  (Root(..))
+  (Root(..), Roots(..))
 import Agda.Unused.Utils
   (liftMaybe, mapLeft)
 
@@ -1802,7 +1802,7 @@ checkFilePath r n p = do
 checkPath
   :: MonadIO m
   => [QName]
-  -- ^ The visited modules.
+  -- ^ Visited or ignored modules.
   -> FilePath
   -- ^ The project root path.
   -> FilePath
@@ -1863,13 +1863,13 @@ checkRoots
 checkUnused
   :: FilePath
   -- ^ The project root path.
-  -> [Root]
-  -- ^ A list of public entry points for the project.
+  -> Roots
+  -- ^ The public entry points for the project.
   -> IO (Either Error Unused)
-checkUnused p rs
+checkUnused p (Roots rs is)
   = runExceptT
   $ checkUnusedItems False p (checkRoots rs)
-  >>= \s -> checkPath (stateModules s) p p
+  >>= \s -> checkPath (is <> stateModules s) p p
   >>= \fs -> pure (Unused (UnusedItems (stateItems s)) fs)
 
 -- | Check an Agda file for unused code.

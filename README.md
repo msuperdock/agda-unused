@@ -57,11 +57,19 @@ Output:
 ## Roots
 
 Running `agda-unused` globally requires an `.agda-roots` file in the project
-root directory. The `.agda-roots` format consists of module names, each followed
-by a list of identifiers. Identifiers may be qualified; this allows us to refer
-to identifiers defined within inner modules. If no identifiers are given for a
-module, then all publicly accessible identifiers in that module are considered
-roots, and will not be marked unused.
+root directory. The `.agda-roots` format consists of:
+
+- Module names, each followed by a list of (possibly qualified) identifiers.
+- Module names in parentheses.
+
+All given module names not in parentheses are checked, along with their
+dependencies. All given identifiers are considered roots; they cannot be marked
+unused. Qualified identifiers refer to identifiers defined within inner modules.
+If no identifiers are given for a module, all publicly accessible identifiers
+are considered roots.
+
+All given module names in parentheses are ignored when checking for unused
+files. Such modules may still be checked if imported by another module.
 
 Example:
 
@@ -73,19 +81,15 @@ Pythagorean.Core
 - isTriple
 - allTriples
 
+(Pythagorean.Examples)
+
 Pythagorean.Theorems
 
 Pythagorean.Utils
 - Print.prettyNat
 ```
 
-Spacing and indentation are irrelevant; the only requirement is that module
-names, identifiers, and the list symbol (`-`) appear in an appropriate order,
-separated by any number of spaces of any kind.
-
-We also supply an `agda-roots` executable which extracts a list of root files,
-separated by newlines, from an `.agda-roots` file; run `agda-roots --help` for
-more information.
+Spacing and indentation are irrelevant.
 
 ## Usage
 

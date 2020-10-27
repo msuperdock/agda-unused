@@ -1,16 +1,16 @@
 {- |
-Module: Agda.Unused.Types.Config
+Module: Agda.Unused.Parse
 
-Parsing function for configuration file, which contains a list of roots.
+Parsers for roots.
 -}
-module Agda.Unused.Config
+module Agda.Unused.Parse
   ( parseConfig
   ) where
 
 import Agda.Unused.Types.Name
   (Name(..), NamePart(..), QName(..))
 import Agda.Unused.Types.Root
-  (Root(..))
+  (Root(..), Roots, fromList)
 import Agda.Unused.Utils
   (mapLeft)
 
@@ -25,7 +25,7 @@ import qualified Data.Text
 import Data.Void
   (Void)
 import Text.Megaparsec
-  (Parsec, (<|>), many, parse, satisfy, some, try)
+  (Parsec, (<|>), between, many, parse, satisfy, some, try)
 import Text.Megaparsec.Char
   (char, space1)
 import qualified Text.Megaparsec.Char.Lexer
@@ -39,6 +39,10 @@ isNameChar
   :: Char
   -> Bool
 isNameChar '.'
+  = False
+isNameChar '('
+  = False
+isNameChar ')'
   = False
 isNameChar c | isSpace c
   = False
@@ -75,29 +79,34 @@ parseHyphen
 parseHyphen
   = void (char '-')
 
+parseParens
+  :: Parser a
+  -> Parser a
+parseParens
+  = between (char '(') (char ')')
+
 parseNamePart
   :: Parser NamePart
 parseNamePart
-  = Id
-    <$> some (satisfy isNameChar)
+  = Id <$> some (satisfy isNameChar)
 
 parseName
   :: Parser Name
 parseName
-  = Name
-    <$> some parseNamePart
+  = Name <$> some parseNamePart
 
 parseQName
   :: Parser QName
 parseQName
-  = try (Qual
-    <$> parseName
-    <* parseDot
-    <*> parseQName)
-  <|> QName
-    <$> parseName
+  = try (Qual <$> parseName <* parseDot <*> parseQName)
+  <|> QName <$> parseName
 
--- Consume spaces afterwards.
+parseIgnore
+  :: Parser QName
+parseIgnore
+  = parseParens (between parseSpace parseSpace parseQName)
+  <* parseSpace
+
 parseRootName
   :: Parser QName
 parseRootName
@@ -106,28 +115,36 @@ parseRootName
   *> parseQName
   <* parseSpace
 
--- Consume spaces afterwards.
 parseRootNames
   :: Parser (Maybe [QName])
 parseRootNames
-  = listMaybe
-  <$> many parseRootName
+  = listMaybe <$> many parseRootName
 
--- Consume spaces afterwards.
 parseRoot
   :: Parser Root
 parseRoot
   = Root
-    <$> parseQName
-    <* parseSpace
-    <*> parseRootNames
+  <$> parseQName
+  <* parseSpace
+  <*> parseRootNames
 
--- | Parse configuration, producing either an error message or a list of roots.
+parseRootEither
+  :: Parser (Either QName Root)
+parseRootEither
+  = Left <$> parseIgnore
+  <|> Right <$> parseRoot
+
+parseRoots
+  :: Parser Roots
+parseRoots
+  = fromList <$> many parseRootEither
+
+-- | Parse configuration, producing either an error or a collection of roots.
 parseConfig
   :: Text
-  -> Either Text [Root]
+  -> Either Text Roots
 parseConfig
   = mapLeft T.pack
   . mapLeft errorBundlePretty
-  . parse (many parseRoot) ".agda-roots"
+  . parse (parseSpace *> parseRoots) ".agda-roots"
 

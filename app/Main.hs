@@ -2,10 +2,10 @@ module Main where
 
 import Agda.Unused.Check
   (checkUnused, checkUnusedLocal)
-import Agda.Unused.Config
-  (parseConfig)
 import qualified Agda.Unused.Monad.Error
   as E
+import Agda.Unused.Parse
+  (parseConfig)
 import qualified Agda.Unused.Print
   as P
 import Agda.Unused.Types.Name

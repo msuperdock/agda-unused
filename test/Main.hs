@@ -305,6 +305,9 @@ data DeclarationTest where
   Mutual2
     :: DeclarationTest
 
+  Private'
+    :: DeclarationTest
+
   Postulate'
     :: DeclarationTest
 
@@ -381,6 +384,8 @@ testModule (Declaration Mutual1)
   = "Mutual1"
 testModule (Declaration Mutual2)
   = "Mutual2"
+testModule (Declaration Private')
+  = "Private"
 testModule (Declaration Postulate')
   = "Postulate"
 testModule (Declaration Open')
@@ -558,6 +563,13 @@ testResult n
       ~: Definition
     ]
 
+  Declaration Private' ->
+    [ private "g"
+      ~: Definition
+    , private "h"
+      ~: Definition
+    ]
+
   Declaration Postulate' ->
     [ "g"
       ~: Postulate
@@ -678,6 +690,8 @@ testDeclaration
   >> it "checks mutual blocks (Mutual)"
     (testCheck (Declaration Mutual1)
     >> testCheck (Declaration Mutual2))
+  >> it "checks private blocks (Private)"
+    (testCheck (Declaration Private'))
   >> it "checks postulates (Postulate)"
     (testCheck (Declaration Postulate'))
   >> it "checks open statements (Open)"

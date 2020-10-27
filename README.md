@@ -63,15 +63,15 @@ root directory. The `.agda-roots` format consists of:
 - Module names in parentheses.
 
 All given module names not in parentheses are checked, along with their
-dependencies. All given identifiers are considered roots; they cannot be marked
-unused. Qualified identifiers refer to identifiers defined within inner modules.
-If no identifiers are given for a module, all publicly accessible identifiers
-are considered roots.
+dependencies. The given identifiers are considered roots; they will not be
+marked unused. Qualified identifiers refer to identifiers defined within inner
+modules. If no identifiers are given for a module, all publicly accessible
+identifiers are considered roots.
 
 All given module names in parentheses are ignored when checking for unused
 files. Such modules may still be checked if imported by another module.
 
-Example:
+Example `.agda-roots` file:
 
 ```
 Main

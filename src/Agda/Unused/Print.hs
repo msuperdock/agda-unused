@@ -248,7 +248,7 @@ printRangeInfoWith r i
 printRangeInfo
   :: RangeInfo
   -> Text
-printRangeInfo (RangeInfo t n)
+printRangeInfo (RangeNamed t n)
   = T.unwords ["unused", printRangeType t, quote (printQName n)]
 printRangeInfo RangeMutual
   = "unused mutually recursive definition"

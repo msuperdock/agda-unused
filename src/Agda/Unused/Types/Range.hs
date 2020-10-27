@@ -74,7 +74,7 @@ data RangeType where
 -- | Information associated with an item found at a certain range.
 data RangeInfo where
 
-  RangeInfo
+  RangeNamed
     :: !RangeType
     -> !QName
     -> RangeInfo

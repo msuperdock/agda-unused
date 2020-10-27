@@ -154,33 +154,33 @@ data RangeType where
   -> RangeType
   -> (Access, RangeInfo)
 n ~: Data
-  = (access n, RangeInfo R.RangeData (name n))
+  = (access n, RangeNamed R.RangeData (name n))
 n ~: Definition
-  = (access n, RangeInfo R.RangeDefinition (name n))
+  = (access n, RangeNamed R.RangeDefinition (name n))
 n ~: Import
-  = (access n, RangeInfo R.RangeImport (name n))
+  = (access n, RangeNamed R.RangeImport (name n))
 n ~: ImportItem
-  = (access n, RangeInfo R.RangeImportItem (name n))
+  = (access n, RangeNamed R.RangeImportItem (name n))
 n ~: Module
-  = (access n, RangeInfo R.RangeModule (name n))
+  = (access n, RangeNamed R.RangeModule (name n))
 n ~: ModuleItem
-  = (access n, RangeInfo R.RangeModuleItem (name n))
+  = (access n, RangeNamed R.RangeModuleItem (name n))
 n ~: Mutual
   = (access n, RangeMutual)
 n ~: Open
-  = (access n, RangeInfo R.RangeOpen (name n))
+  = (access n, RangeNamed R.RangeOpen (name n))
 n ~: OpenItem
-  = (access n, RangeInfo R.RangeOpenItem (name n))
+  = (access n, RangeNamed R.RangeOpenItem (name n))
 n ~: PatternSynonym
-  = (access n, RangeInfo R.RangePatternSynonym (name n))
+  = (access n, RangeNamed R.RangePatternSynonym (name n))
 n ~: Postulate
-  = (access n, RangeInfo R.RangePostulate (name n))
+  = (access n, RangeNamed R.RangePostulate (name n))
 n ~: Record
-  = (access n, RangeInfo R.RangeRecord (name n))
+  = (access n, RangeNamed R.RangeRecord (name n))
 n ~: RecordConstructor
-  = (access n, RangeInfo R.RangeRecordConstructor (name n))
+  = (access n, RangeNamed R.RangeRecordConstructor (name n))
 n ~: Variable
-  = (access n, RangeInfo R.RangeVariable (name n))
+  = (access n, RangeNamed R.RangeVariable (name n))
 
 -- ## Expectations
 

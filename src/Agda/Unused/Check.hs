@@ -256,7 +256,7 @@ checkName _ _ _ _ NoRange _
 checkName _ _ _ _ _ (Name [Hole])
   = pure mempty
 checkName p fs a t r@(Range _ _) n
-  = modifyInsert r (RangeInfo t (QName n))
+  = modifyInsert r (RangeNamed t (QName n))
   >> pure (accessContextItem n a (bool item itemPattern p [r] (syntax fs n)))
 
 checkName'
@@ -343,7 +343,7 @@ checkModuleName
   -> Name
   -> m AccessContext
 checkModuleName c a r n
-  = modifyInsert r (RangeInfo RangeModule (QName n))
+  = modifyInsert r (RangeNamed RangeModule (QName n))
   >> contextInsertRangeAll r c
   >>= \c' -> pure (accessContextModule n (AccessModule a [r] c'))
 
@@ -1455,7 +1455,7 @@ checkNiceConstructorRecord
   -> Name
   -> m AccessContext
 checkNiceConstructorRecord fs rs r n
-  = modifyInsert r (RangeInfo RangeRecordConstructor (QName n))
+  = modifyInsert r (RangeNamed RangeRecordConstructor (QName n))
   >> pure (accessContextItem n Public (itemConstructor (r : rs) (syntax fs n)))
 
 checkNiceConstructorRecordMay
@@ -1536,13 +1536,13 @@ checkImportDirective
   -> ImportDirective
   -> m Context
 checkImportDirective dt r n c (ImportDirective _ UseEverything hs rs _)
-  = maybe (pure ()) (\t -> modifyInsert r (RangeInfo t n))
+  = maybe (pure ()) (\t -> modifyInsert r (RangeNamed t n))
     (directiveStatement dt)
   >> modifyHidings c hs
   >>= flip (modifyRenamings dt) rs
   >>= contextInsertRangeAll r
 checkImportDirective dt r n c (ImportDirective _ (Using ns) _ rs _)
-  = maybe (pure ()) (\t -> modifyInsert r (RangeInfo t n))
+  = maybe (pure ()) (\t -> modifyInsert r (RangeNamed t n))
     (directiveStatement dt)
   >> checkImportedNames dt c ns
   >>= \c' -> checkRenamings dt c rs
@@ -1592,14 +1592,14 @@ checkImportedNamePair
 checkImportedNamePair dt c (_, ImportedName n, ImportedName t)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange t)) (fromNameRange t)
-  >>= \(r, t') -> modifyInsert r (RangeInfo (directiveItem dt) (QName t'))
+  >>= \(r, t') -> modifyInsert r (RangeNamed (directiveItem dt) (QName t'))
   >> pure (maybe mempty (contextItem t') (contextLookupItem (QName n') c)
     <> maybe mempty (contextModule t') (contextLookupModule (QName n') c))
   >>= contextInsertRangeAll r
 checkImportedNamePair dt c (_, ImportedModule n, ImportedModule t)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange t)) (fromNameRange t)
-  >>= \(r, t') -> modifyInsert r (RangeInfo (directiveItem dt) (QName t'))
+  >>= \(r, t') -> modifyInsert r (RangeNamed (directiveItem dt) (QName t'))
   >> pure (maybe mempty (contextModule t') (contextLookupModule (QName n') c))
   >>= contextInsertRangeAll r
 checkImportedNamePair _ _ (r, _, _)
@@ -1647,13 +1647,13 @@ modifyRenaming
 modifyRenaming dt c (Renaming (ImportedName n) (ImportedName t) _ _)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange t)) (fromNameRange t)
-  >>= \(r, t') -> modifyInsert r (RangeInfo (directiveItem dt) (QName t'))
+  >>= \(r, t') -> modifyInsert r (RangeNamed (directiveItem dt) (QName t'))
   >> contextRename n' t' r c
   >>= contextRenameModule n' t' r
 modifyRenaming dt c (Renaming (ImportedModule n) (ImportedModule t) _ _)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange t)) (fromNameRange t)
-  >>= \(r, t') -> modifyInsert r (RangeInfo (directiveItem dt) (QName t'))
+  >>= \(r, t') -> modifyInsert r (RangeNamed (directiveItem dt) (QName t'))
   >> contextRenameModule n' t' r c
 modifyRenaming _ _ r
   = throwError (ErrorInternal ErrorRenaming (getRange r))

@@ -38,52 +38,11 @@ import Paths_agda_unused
 
 -- ## Names
 
-newtype PrivateName
-  = PrivateName
-  { privateQName
-    :: QName
-  } deriving Show
-
-class IsName a where
-
-  name
-    :: a
-    -> QName
-
-  access
-    :: a
-    -> Access
-
-instance IsName QName where
-
-  name
-    = id
-
-  access _
-    = Public
-
-instance IsName String where
-
-  name n
-    = QName (Name [Id n])
-
-  access _
-    = Public
-
-instance IsName PrivateName where
-
-  name
-    = privateQName
-
-  access _
-    = Private
-
-private
-  :: IsName a
-  => a
-  -> PrivateName
-private n
-  = PrivateName (name n)
+name
+  :: String
+  -> QName
+name n
+  = QName (Name [Id n])
 
 land
   :: QName
@@ -155,39 +114,57 @@ data RangeType where
 
   deriving Show
 
+rangeInfo
+  :: QName
+  -> RangeType
+  -> RangeInfo
+rangeInfo n Data
+  = RangeNamed R.RangeData n
+rangeInfo n Definition
+  = RangeNamed R.RangeDefinition n
+rangeInfo n Import
+  = RangeNamed R.RangeImport n
+rangeInfo n ImportItem
+  = RangeNamed R.RangeImportItem n
+rangeInfo n Module
+  = RangeNamed R.RangeModule n
+rangeInfo n ModuleItem
+  = RangeNamed R.RangeModuleItem n
+rangeInfo _ Mutual
+  = RangeMutual
+rangeInfo n Open
+  = RangeNamed R.RangeOpen n
+rangeInfo n OpenItem
+  = RangeNamed R.RangeOpenItem n
+rangeInfo n PatternSynonym
+  = RangeNamed R.RangePatternSynonym n
+rangeInfo n Postulate
+  = RangeNamed R.RangePostulate n
+rangeInfo n Record
+  = RangeNamed R.RangeRecord n
+rangeInfo n RecordConstructor
+  = RangeNamed R.RangeRecordConstructor n
+rangeInfo n Variable
+  = RangeNamed R.RangeVariable n
+
+private
+  :: QName
+  -> (Access, QName)
+private n
+  = (Private, n)
+
+public
+  :: QName
+  -> (Access, QName)
+public n
+  = (Public, n)
+
 (~:)
-  :: IsName a
-  => a
+  :: (Access, QName)
   -> RangeType
   -> (Access, RangeInfo)
-n ~: Data
-  = (access n, RangeNamed R.RangeData (name n))
-n ~: Definition
-  = (access n, RangeNamed R.RangeDefinition (name n))
-n ~: Import
-  = (access n, RangeNamed R.RangeImport (name n))
-n ~: ImportItem
-  = (access n, RangeNamed R.RangeImportItem (name n))
-n ~: Module
-  = (access n, RangeNamed R.RangeModule (name n))
-n ~: ModuleItem
-  = (access n, RangeNamed R.RangeModuleItem (name n))
-n ~: Mutual
-  = (access n, RangeMutual)
-n ~: Open
-  = (access n, RangeNamed R.RangeOpen (name n))
-n ~: OpenItem
-  = (access n, RangeNamed R.RangeOpenItem (name n))
-n ~: PatternSynonym
-  = (access n, RangeNamed R.RangePatternSynonym (name n))
-n ~: Postulate
-  = (access n, RangeNamed R.RangePostulate (name n))
-n ~: Record
-  = (access n, RangeNamed R.RangeRecord (name n))
-n ~: RecordConstructor
-  = (access n, RangeNamed R.RangeRecordConstructor (name n))
-n ~: Variable
-  = (access n, RangeNamed R.RangeVariable (name n))
+(a, n) ~: t
+  = (a, rangeInfo n t)
 
 -- ## Expectations
 
@@ -239,12 +216,12 @@ testUnusedOutput
   :: Maybe [Text]
   -> Expectation
 testUnusedOutput (Just [t0, t1, t2, t3, t4, t5])
-  = (t0 `shouldSatisfy` T.isSuffixOf (T.pack "/Test.agda:4,23-27"))
-  >> (t1 `shouldBe` T.pack "  unused imported item ‘true’")
-  >> (t2 `shouldSatisfy` T.isSuffixOf (T.pack "/Test.agda:5,1-30"))
-  >> (t3 `shouldBe` T.pack "  unused import ‘Agda.Builtin.Unit’")
-  >> (t4 `shouldSatisfy` T.isSuffixOf (T.pack "/Test.agda:11,9-10"))
-  >> (t5 `shouldBe` T.pack "  unused variable ‘x’")
+  = (t0 `shouldSatisfy` T.isSuffixOf "/Test.agda:4,23-27")
+  >> (t1 `shouldBe` "  unused imported item ‘true’")
+  >> (t2 `shouldSatisfy` T.isSuffixOf "/Test.agda:5,1-30")
+  >> (t3 `shouldBe` "  unused import ‘Agda.Builtin.Unit’")
+  >> (t4 `shouldSatisfy` T.isSuffixOf "/Test.agda:11,9-10")
+  >> (t5 `shouldBe` "  unused variable ‘x’")
 testUnusedOutput _
   = expectationFailure ""
 
@@ -448,231 +425,231 @@ testResult n
   = case n of
 
   Pattern IdentP ->
-    [ private "y"
+    [ private (name "y")
       ~: Variable
-    , "f"
+    , public (name "f")
       ~: Definition
-    , "g"
+    , public (name "g")
       ~: Definition
     ]
 
   Pattern OpAppP ->
-    [ land
+    [ public land
       ~: Definition
     ]
 
   Pattern AsP ->
-    [ private "y"
+    [ private (name "y")
       ~: Variable
-    , private "z"
+    , private (name "z")
       ~: Variable
-    , private "w"
+    , private (name "w")
       ~: Variable
-    , private "z'"
+    , private (name "z'")
       ~: Variable
-    , private "w'"
+    , private (name "w'")
       ~: Variable
-    , "f"
+    , public (name "f")
       ~: Definition
-    , "g"
+    , public (name "g")
       ~: Definition
     ]
 
   Expression WithApp ->
-    [ "f"
+    [ public (name "f")
       ~: Definition
-    , "g"
+    , public (name "g")
       ~: Definition
     ]
 
   Expression Lam ->
-    [ private "y"
+    [ private (name "y")
       ~: Variable
-    , private "y'"
+    , private (name "y'")
       ~: Variable
-    , "f"
+    , public (name "f")
       ~: Definition
-    , "g"
+    , public (name "g")
       ~: Definition
     ]
 
   Expression ExtendedLam ->
-    [ private "x"
+    [ private (name "x")
       ~: Variable
-    , "f"
+    , public (name "f")
       ~: Definition
     ]
 
   Expression Pi ->
-    [ private "y"
+    [ private (name "y")
       ~: Variable
-    , private "w"
+    , private (name "w")
       ~: Variable
-    , "f"
+    , public (name "f")
       ~: Definition
     ]
 
   Expression Let ->
-    [ private "z"
+    [ private (name "z")
       ~: Definition
-    , "f"
+    , public (name "f")
       ~: Definition
     ]
 
   Expression DoBlock1 ->
-    [ private "z"
+    [ private (name "z")
       ~: Variable
-    , "f"
+    , public (name "f")
       ~: Definition
     ]
 
   Expression DoBlock2 ->
-    [ bind_
+    [ public bind_
       ~: Definition
-    , "f"
+    , public (name "f")
       ~: Definition
     ]
 
   Expression DoBlock3 ->
-    [ bind
+    [ public bind
       ~: Definition
-    , "f"
+    , public (name "f")
       ~: Definition
     ]
 
   Expression DoBlock4 ->
-    [ bind
+    [ public bind
       ~: Definition
-    , bind_
+    , public bind_
       ~: Definition
-    , "f"
+    , public (name "f")
       ~: Definition
     ]
 
   Declaration TypeSig ->
-    [ "g"
+    [ public (name "g")
       ~: Definition
-    , "h"
+    , public (name "h")
       ~: Definition
     ]
 
   Declaration FunClause ->
-    [ private "z"
+    [ private (name "z")
       ~: Definition
-    , "f"
+    , public (name "f")
       ~: Definition
-    , "snoc"
+    , public (name "snoc")
       ~: Definition
     ]
 
   Declaration Data' ->
-    [ "D"
+    [ public (name "D")
       ~: Data
     ]
 
   Declaration Record' ->
-    [ "B"
+    [ public (name "B")
       ~: Record
-    , "c"
+    , public (name "c")
       ~: RecordConstructor
-    , "x"
+    , public (name "x")
       ~: Definition
-    , "y"
+    , public (name "y")
       ~: Definition
     ]
 
   Declaration Syntax ->
-    [ "p1"
+    [ public (name "p1")
       ~: Postulate
-    , "p1'"
+    , public (name "p1'")
       ~: Postulate
     ]
 
   Declaration PatternSyn ->
-    [ "q"
+    [ public (name "q")
       ~: PatternSynonym
-    , "f"
+    , public (name "f")
       ~: Definition
-    , "g"
+    , public (name "g")
       ~: Definition
     ]
 
   Declaration Mutual1 ->
-    [ "_"
+    [ public (name "_")
       ~: Mutual
     ]
 
   Declaration Mutual2 ->
-    [ "is-even'"
+    [ public (name "is-even'")
       ~: Definition
     ]
 
   Declaration Abstract ->
-    [ "g"
+    [ public (name "g")
       ~: Definition
-    , "h"
+    , public (name "h")
       ~: Definition
     ]
 
   Declaration Private' ->
-    [ private "g"
+    [ private (name "g")
       ~: Definition
-    , private "h"
+    , private (name "h")
       ~: Definition
     ]
 
   Declaration Postulate' ->
-    [ "g"
+    [ public (name "g")
       ~: Postulate
-    , "h"
+    , public (name "h")
       ~: Definition
     ]
 
   Declaration Open' ->
-    [ private "N"
+    [ private (name "N")
       ~: Open
-    , private "P"
+    , private (name "P")
       ~: Open
-    , "Q"
+    , public (name "Q")
       ~: Module
-    , private "x'"
+    , private (name "x'")
       ~: OpenItem
-    , "v"
+    , public (name "v")
       ~: Definition
-    , "y"
+    , public (name "y")
       ~: Definition
     ]
 
   Declaration Import' ->
     [ private agdaBuiltinBool
       ~: Import
-    , private "tt"
+    , private (name "tt")
       ~: ImportItem
-    , "A"
+    , public (name "A")
       ~: Definition
     ]
 
   Declaration ModuleMacro ->
-    [ private "x"
+    [ private (name "x")
       ~: Variable
-    , "Q"
+    , public (name "Q")
       ~: Module
-    , "A'"
+    , public (name "A'")
       ~: ModuleItem
-    , "C"
+    , public (name "C")
       ~: Definition
-    , "D"
+    , public (name "D")
       ~: Definition
-    , "y"
+    , public (name "y")
       ~: Definition
     ]
 
   Declaration Module' ->
-    [ "O"
+    [ public (name "O")
       ~: Module
-    , "P"
+    , public (name "P")
       ~: Module
-    , "x"
+    , public (name "x")
       ~: Definition
     ]
 

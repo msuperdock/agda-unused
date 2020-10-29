@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (10/27/2020)
+## 0.1.0 (Oct. 2020)
 
 Initial release.
 

@@ -30,8 +30,6 @@ module Agda.Unused.Types.Context
   
     -- ** Insert
 
-  , contextInsertRange
-  , contextInsertRangeModule
   , contextInsertRangeAll
   , accessContextInsertRangeAll
 
@@ -39,11 +37,6 @@ module Agda.Unused.Types.Context
 
   , contextDelete
   , contextDeleteModule
-
-    -- ** Rename
-
-  , contextRename
-  , contextRenameModule
 
     -- ** Define
 
@@ -83,8 +76,6 @@ import Agda.Unused.Types.Name
   (Name, QName(..), matchOperators, stripPrefix)
 import Agda.Unused.Types.Range
   (Range)
-import Agda.Unused.Utils
-  (mapUpdateKey)
 
 import Data.Map.Strict
   (Map)
@@ -454,24 +445,6 @@ accessItemInsertRange r (AccessItemSyntax b rs)
 accessItemInsertRange r (AccessItem b a rs n)
   = AccessItem b a (r : rs) n
 
--- | Insert a range for the given name, if present.
-contextInsertRange
-  :: Name
-  -> Range
-  -> Context
-  -> Context
-contextInsertRange n r (Context is ms)
-  = Context (Map.adjust (itemInsertRange r) n is) ms
-
--- | Insert a range for all names in the given module, if present.
-contextInsertRangeModule
-  :: Name
-  -> Range
-  -> Context
-  -> Context
-contextInsertRangeModule n r (Context is ms)
-  = Context is (Map.adjust (moduleInsertRangeAll r) n ms)
-
 moduleInsertRangeAll
   :: Range
   -> Module
@@ -523,26 +496,6 @@ contextDeleteModule
   -> Context
 contextDeleteModule n (Context is ms)
   = Context is (Map.delete n ms)
-
--- ### Rename
-
--- | Rename an item, if present.
-contextRename
-  :: Name
-  -> Name
-  -> Context
-  -> Context
-contextRename n n' (Context is ms)
-  = Context (mapUpdateKey n n' is) ms
-
--- | Rename a module, if present.
-contextRenameModule
-  :: Name
-  -> Name
-  -> Context
-  -> Context
-contextRenameModule n n' (Context is ms)
-  = Context is (mapUpdateKey n n' ms)
 
 -- ### Define
 

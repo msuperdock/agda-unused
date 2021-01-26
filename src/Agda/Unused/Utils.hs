@@ -20,7 +20,6 @@ module Agda.Unused.Utils
     -- * Map
 
   , mapDeletes
-  , mapUpdateKey
 
   ) where
 
@@ -79,17 +78,4 @@ mapDeletes
   -> Map k a
 mapDeletes ks xs
   = foldr Map.delete xs ks
-
--- | Modify a key of a map.
---
--- - If the source key is not present, do nothing.
--- - If the target key is already present, overwrite it.
-mapUpdateKey
-  :: Ord k
-  => k
-  -> k
-  -> Map k a
-  -> Map k a
-mapUpdateKey k k' m
-  = maybe m (\x -> Map.insert k' x (Map.delete k m)) (Map.lookup k m)
 

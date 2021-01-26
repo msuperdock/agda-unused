@@ -4,7 +4,7 @@
 
 Initial release.
 
-## 0.1.1
+## 0.2.0
 
-- Simplified test code.
+- Handle renaming directives simultaneously (fixes bug).
 

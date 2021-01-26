@@ -97,26 +97,6 @@ import Paths_agda_unused
 -- ## Context
 
 -- Do nothing if `askSkip` returns true.
-contextInsertRange
-  :: MonadReader Environment m
-  => Name
-  -> Range
-  -> Context
-  -> m Context
-contextInsertRange n r c
-  = askSkip >>= pure . bool (C.contextInsertRange n r c) c
-
--- Do nothing if `askSkip` returns true.
-contextInsertRangeModule
-  :: MonadReader Environment m
-  => Name
-  -> Range
-  -> Context
-  -> m Context
-contextInsertRangeModule n r c
-  = askSkip >>= pure . bool (C.contextInsertRangeModule n r c) c
-
--- Do nothing if `askSkip` returns true.
 contextInsertRangeAll
   :: MonadReader Environment m
   => Range
@@ -133,30 +113,6 @@ accessContextInsertRangeAll
   -> m AccessContext
 accessContextInsertRangeAll r c
   = askSkip >>= pure . bool (C.accessContextInsertRangeAll r c) c
-
--- Also insert range unless `askSkip` returns true.
-contextRename
-  :: MonadReader Environment m
-  => Name
-  -> Name
-  -> Range
-  -> Context
-  -> m Context
-contextRename n t r c
-  = contextInsertRange n r c
-  >>= pure . C.contextRename n t
-
--- Also insert range unless `askSkip` returns true.
-contextRenameModule
-  :: MonadReader Environment m
-  => Name
-  -> Name
-  -> Range
-  -> Context
-  -> m Context
-contextRenameModule n t r c
-  = contextInsertRangeModule n r c
-  >>= pure . C.contextRenameModule n t
 
 -- ## Syntax
 
@@ -1538,9 +1494,9 @@ checkImportDirective
 checkImportDirective dt r n c (ImportDirective _ UseEverything hs rs _)
   = maybe (pure ()) (\t -> modifyInsert r (RangeNamed t n))
     (directiveStatement dt)
-  >> modifyHidings c hs
-  >>= flip (modifyRenamings dt) rs
-  >>= contextInsertRangeAll r
+  >> modifyHidings c (hs <> (renFrom <$> rs))
+  >>= \c' -> checkRenamings dt c rs
+  >>= \c'' -> contextInsertRangeAll r (c' <> c'')
 checkImportDirective dt r n c (ImportDirective _ (Using ns) _ rs _)
   = maybe (pure ()) (\t -> modifyInsert r (RangeNamed t n))
     (directiveStatement dt)
@@ -1635,39 +1591,6 @@ modifyHidings
   -> m Context
 modifyHidings
   = foldM modifyHiding
-
-modifyRenaming
-  :: MonadError Error m
-  => MonadReader Environment m
-  => MonadState State m
-  => DirectiveType
-  -> Context
-  -> Renaming
-  -> m Context
-modifyRenaming dt c (Renaming (ImportedName n) (ImportedName t) _ _)
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
-  >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange t)) (fromNameRange t)
-  >>= \(r, t') -> modifyInsert r (RangeNamed (directiveItem dt) (QName t'))
-  >> contextRename n' t' r c
-  >>= contextRenameModule n' t' r
-modifyRenaming dt c (Renaming (ImportedModule n) (ImportedModule t) _ _)
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
-  >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange t)) (fromNameRange t)
-  >>= \(r, t') -> modifyInsert r (RangeNamed (directiveItem dt) (QName t'))
-  >> contextRenameModule n' t' r c
-modifyRenaming _ _ r
-  = throwError (ErrorInternal ErrorRenaming (getRange r))
-
-modifyRenamings
-  :: MonadError Error m
-  => MonadReader Environment m
-  => MonadState State m
-  => DirectiveType
-  -> Context
-  -> [Renaming]
-  -> m Context
-modifyRenamings dt
-  = foldM (modifyRenaming dt)
 
 touchModule
   :: MonadError Error m

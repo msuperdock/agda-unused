@@ -330,7 +330,10 @@ data DeclarationTest where
   Postulate'
     :: DeclarationTest
 
-  Open'
+  Open1
+    :: DeclarationTest
+
+  Open2
     :: DeclarationTest
 
   Import'
@@ -409,8 +412,10 @@ testModule (Declaration Private')
   = "Private"
 testModule (Declaration Postulate')
   = "Postulate"
-testModule (Declaration Open')
-  = "Open"
+testModule (Declaration Open1)
+  = "Open1"
+testModule (Declaration Open2)
+  = "Open2"
 testModule (Declaration Import')
   = "Import"
 testModule (Declaration ModuleMacro)
@@ -605,7 +610,7 @@ testResult n
       ~: Definition
     ]
 
-  Declaration Open' ->
+  Declaration Open1 ->
     [ private (name "N")
       ~: Open
     , private (name "P")
@@ -618,6 +623,13 @@ testResult n
       ~: Definition
     , public (name "y")
       ~: Definition
+    ]
+
+  Declaration Open2 ->
+    [ public (name "z")
+      ~: OpenItem
+    , public (name "p")
+      ~: Postulate
     ]
 
   Declaration Import' ->
@@ -726,7 +738,8 @@ testDeclaration
   >> it "checks postulates (Postulate)"
     (testCheck (Declaration Postulate'))
   >> it "checks open statements (Open)"
-    (testCheck (Declaration Open'))
+    (testCheck (Declaration Open1)
+    >> testCheck (Declaration Open2))
   >> it "checks import statements (Import)"
     (testCheck (Declaration Import'))
   >> it "checks module macros (ModuleMacro)"

@@ -108,6 +108,8 @@ stateItemsFilter []
   = []
 stateItemsFilter (i : i' : is) | rangeContains (fst i) (fst i')
   = stateItemsFilter (i : is)
+stateItemsFilter (i : i' : is) | rangeContains (fst i') (fst i)
+  = stateItemsFilter (i' : is)
 stateItemsFilter (i : is)
   = i : stateItemsFilter is
 

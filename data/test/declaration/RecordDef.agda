@@ -16,9 +16,14 @@ data ⊤'
     : ⊤' x
 
 record R
-  {x : ⊤}
-  (y : ⊤' x)
+  {y : ⊤}
+  (y' : ⊤' y)
   : Set
 
-record R {x} _ where
+record R {z} _ where
+
+postulate
+
+  r
+    : R tt
 

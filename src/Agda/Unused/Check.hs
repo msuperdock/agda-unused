@@ -43,8 +43,8 @@ import Agda.Unused.Utils
 
 import Agda.Syntax.Common
   (Arg(..), Fixity'(..), GenPart(..), ImportDirective'(..), ImportedName'(..),
-    Named(..), Ranged(..), Renaming'(..), RewriteEqn'(..), Using'(..),
-    namedThing, unArg, whThing)
+    IsInstance, Named(..), Ranged(..), Renaming'(..), RewriteEqn'(..),
+    Using'(..), namedThing, unArg, whThing)
 import qualified Agda.Syntax.Common
   as Common
 import Agda.Syntax.Concrete
@@ -55,11 +55,11 @@ import Agda.Syntax.Concrete
     RecordAssignment, Renaming, RewriteEqn, RHS, RHS'(..), TypedBinding,
     TypedBinding'(..), WhereClause, WhereClause'(..), _exprFieldA)
 import Agda.Syntax.Concrete.Definitions
-  (Clause(..), NiceDeclaration(..), niceDeclarations, runNice)
+  (Clause(..), NiceConstructor, NiceDeclaration(..), niceDeclarations, runNice)
 import Agda.Syntax.Concrete.Fixity
   (DoWarn(..), Fixities, fixitiesAndPolarities)
 import Agda.Syntax.Concrete.Name
-  (NameInScope(..), NamePart(..))
+  (NameInScope(..), NamePart(..), nameRange)
 import qualified Agda.Syntax.Concrete.Name
   as N
 import Agda.Syntax.Parser
@@ -1128,6 +1128,10 @@ checkNiceDeclaration fs c (FunSig _ a _ _ _ _ _ _ n e)
   = checkExpr c e >> checkName' False fs (fromAccess a) RangeDefinition n
 checkNiceDeclaration _ c (FunDef _ _ _ _ _ _ _ cs)
   = checkClauses c cs >> pure mempty
+checkNiceDeclaration fs c (NiceDataDef _ _ _ _ _ n bs cs)
+  = checkNiceDataDef True fs c n bs cs
+checkNiceDeclaration fs c (NiceRecDef _ _ _ _ _ n _ _ m bs ds)
+  = checkNiceRecordDef True fs c n m bs ds
 checkNiceDeclaration _ c (NiceGeneralize _ _ _ _ _ e)
   = checkExpr c e >> pure mempty
 checkNiceDeclaration _ _ (NiceUnquoteDecl r _ _ _ _ _ _ _)
@@ -1137,15 +1141,21 @@ checkNiceDeclaration _ _ (NiceUnquoteDef r _ _ _ _ _ _)
 
 checkNiceDeclaration fs c
   (NiceMutual _ _ _ _
-    ds@(NiceRecSig _ _ _ _ _ _ _ _ : NiceRecDef _ _ _ _ _ _ _ _ _ _ _ : _))
-  = checkNiceDeclarations fs c ds
+    (d@(NiceRecSig _ _ _ _ _ n _ _) : NiceRecDef _ _ _ _ _ n' _ _ m bs ds : []))
+  | nameRange n == nameRange n'
+  = checkNiceDeclaration fs c d
+  >>= \c' -> checkNiceRecordDef False fs (c <> c') n' m bs ds
+  >>= \c'' -> pure (c' <> c'')
 checkNiceDeclaration fs c
   (NiceMutual _ _ _ _
-    ds@(NiceDataSig _ _ _ _ _ _ _ _ : NiceDataDef _ _ _ _ _ _ _ _ : _))
-  = checkNiceDeclarations fs c ds
+    (d@(NiceDataSig _ _ _ _ _ n _ _) : NiceDataDef _ _ _ _ _ n' bs cs : []))
+  | nameRange n == nameRange n'
+  = checkNiceDeclaration fs c d
+  >>= \c' -> checkNiceDataDef False fs (c <> c') n' bs cs
+  >>= \c'' -> pure (c' <> c'')
 checkNiceDeclaration fs c
   (NiceMutual _ _ _ _
-    ds@(FunSig _ _ _ _ _ _ _ _ _ _ : FunDef _ _ _ _ _ _ _ _ : _))
+    ds@(FunSig _ _ _ _ _ _ _ _ _ _ : FunDef _ _ _ _ _ _ _ _ : []))
   = checkNiceDeclarations fs c ds
 checkNiceDeclaration fs c (NiceMutual r _ _ _ ds)
   = checkNiceDeclarations fs c ds
@@ -1224,21 +1234,6 @@ checkNiceDeclaration _ _ (NiceImport r n (Just a) DoOpen i)
   >>= \c' -> checkImportDirective Import r n' c' i
   >>= \c'' -> checkModuleName c' Public (getRange a) a'
   >>= \c''' -> pure (c''' <> fromContext (importDirectiveAccess i) c'')
-
-checkNiceDeclaration fs c (NiceDataDef _ _ _ _ _ n bs cs)
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
-  >>= \n' -> pure (either (const []) id (accessContextLookup (QName n') c))
-  >>= \rs -> checkLamBindings True c bs
-  >>= \c' -> checkNiceConstructors fs rs (accessContextDefine n' c <> c') cs
-  >>= \c'' -> pure (accessContextModule' n' Public rs c'' <> c'')
-
-checkNiceDeclaration fs c (NiceRecDef _ _ _ _ _ n _ _ m bs ds)
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
-  >>= \n' -> pure (either (const []) id (accessContextLookup (QName n') c))
-  >>= \rs -> checkLamBindings True c bs
-  >>= \c' -> checkNiceConstructorRecordMay fs rs (m >>= fromNameRange . fst)
-  >>= \c'' -> checkDeclarationsRecord n' rs (c <> c') ds
-  >>= \c''' -> pure (accessContextModule' n' Public rs (c'' <> c''') <> c'')
 
 checkNiceDeclaration fs c (NicePatternSyn _ a n ns p)
   = localSkip (checkNames' False Public RangeVariable (unArg <$> ns))
@@ -1366,6 +1361,48 @@ checkNiceSig fs c a t n bs e
   >>= \c' -> checkExpr (c <> c') e
   >> checkName' False fs (fromAccess a) t n
 
+checkNiceDataDef
+  :: MonadError Error m
+  => MonadReader Environment m
+  => MonadState State m
+  => MonadIO m
+  => Bool
+  -- ^ Whether to check bound names in lambda bindings.
+  -> Fixities
+  -> AccessContext
+  -> N.Name
+  -> [LamBinding]
+  -> [NiceConstructor]
+  -> m AccessContext
+checkNiceDataDef b fs c n bs cs
+  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
+  >>= \n' -> pure (either (const []) id (accessContextLookup (QName n') c))
+  >>= \rs -> checkLamBindings b c bs
+  >>= \c' -> checkNiceConstructors fs rs (accessContextDefine n' c <> c') cs
+  >>= \c'' -> pure (accessContextModule' n' Public rs c'' <> c'')
+
+checkNiceRecordDef
+  :: MonadError Error m
+  => MonadReader Environment m
+  => MonadState State m
+  => MonadIO m
+  => Bool
+  -- ^ Whether to check bound names in lambda bindings.
+  -> Fixities
+  -> AccessContext
+  -> N.Name
+  -> Maybe (N.Name, IsInstance)
+  -> [LamBinding]
+  -> [Declaration]
+  -> m AccessContext
+checkNiceRecordDef b fs c n m bs ds
+  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
+  >>= \n' -> pure (either (const []) id (accessContextLookup (QName n') c))
+  >>= \rs -> checkLamBindings b c bs
+  >>= \c' -> checkNiceConstructorRecordMay fs rs (m >>= fromNameRange . fst)
+  >>= \c'' -> checkDeclarationsRecord n' rs (c <> c') ds
+  >>= \c''' -> pure (accessContextModule' n' Public rs (c'' <> c''') <> c'')
+
 checkNiceConstructor
   :: MonadError Error m
   => MonadReader Environment m
@@ -1375,7 +1412,7 @@ checkNiceConstructor
   -> [Range]
   -- ^ Ranges associated with parent type.
   -> AccessContext
-  -> NiceDeclaration
+  -> NiceConstructor
   -> m AccessContext
 checkNiceConstructor fs rs c (Axiom _ a _ _ _ n e)
   = checkExpr c e

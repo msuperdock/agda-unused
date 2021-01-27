@@ -10,3 +10,8 @@ data D A
   c
     : D A
 
+data E
+  (B : Set)
+  : Set
+  where
+

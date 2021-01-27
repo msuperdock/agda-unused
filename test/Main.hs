@@ -558,19 +558,23 @@ testResult n
     ]
 
   Declaration Data' ->
-    [ public (name "D")
+    [ public (name "E")
       ~: Data
+    , public (name "_")
+      ~: Mutual
     ]
 
   Declaration DataDef ->
-    [ public (name "D")
-      ~: Data
-    , private (name "x")
+    [ private (name "z")
       ~: Variable
+    , public (name "d")
+      ~: Postulate
     ]
 
   Declaration Record' ->
     [ public (name "B")
+      ~: Record
+    , public (name "D")
       ~: Record
     , public (name "c")
       ~: RecordConstructor
@@ -581,10 +585,10 @@ testResult n
     ]
 
   Declaration RecordDef ->
-    [ public (name "R")
-      ~: Record
-    , private (name "x")
+    [ private (name "z")
       ~: Variable
+    , public (name "r")
+      ~: Postulate
     ]
 
   Declaration Syntax ->

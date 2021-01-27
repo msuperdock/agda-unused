@@ -16,9 +16,14 @@ data ⊤'
     : ⊤' x
 
 data D
-  {x : ⊤}
-  (y : ⊤' x)
+  {y : ⊤}
+  (y' : ⊤' y)
   : Set
 
-data D {x} _ where
+data D {z} _ where
+
+postulate
+
+  d
+    : D tt
 

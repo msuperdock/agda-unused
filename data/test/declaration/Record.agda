@@ -34,3 +34,8 @@ y
 y
   = record {}
 
+record D
+  (E : Set)
+  : Set
+  where
+

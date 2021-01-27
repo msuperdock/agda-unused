@@ -6,5 +6,6 @@ Initial release.
 
 ## 0.2.0
 
-- Handle renaming directives simultaneously (fixes bug).
+- Check variables in standalone data & record definitions.
+- Check renaming directives simultaneously (fixes bug).
 

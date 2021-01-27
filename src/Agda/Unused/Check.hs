@@ -1228,14 +1228,14 @@ checkNiceDeclaration _ _ (NiceImport r n (Just a) DoOpen i)
 checkNiceDeclaration fs c (NiceDataDef _ _ _ _ _ n bs cs)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> pure (either (const []) id (accessContextLookup (QName n') c))
-  >>= \rs -> checkLamBindings False c bs
+  >>= \rs -> checkLamBindings True c bs
   >>= \c' -> checkNiceConstructors fs rs (accessContextDefine n' c <> c') cs
   >>= \c'' -> pure (accessContextModule' n' Public rs c'' <> c'')
 
 checkNiceDeclaration fs c (NiceRecDef _ _ _ _ _ n _ _ m bs ds)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
   >>= \n' -> pure (either (const []) id (accessContextLookup (QName n') c))
-  >>= \rs -> checkLamBindings False c bs
+  >>= \rs -> checkLamBindings True c bs
   >>= \c' -> checkNiceConstructorRecordMay fs rs (m >>= fromNameRange . fst)
   >>= \c'' -> checkDeclarationsRecord n' rs (c <> c') ds
   >>= \c''' -> pure (accessContextModule' n' Public rs (c'' <> c''') <> c'')

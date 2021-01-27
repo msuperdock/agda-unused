@@ -306,7 +306,13 @@ data DeclarationTest where
   Data'
     :: DeclarationTest
 
+  DataDef
+    :: DeclarationTest
+
   Record'
+    :: DeclarationTest
+
+  RecordDef
     :: DeclarationTest
 
   Syntax
@@ -396,8 +402,12 @@ testModule (Declaration FunClause)
   = "FunClause"
 testModule (Declaration Data')
   = "Data"
+testModule (Declaration DataDef)
+  = "DataDef"
 testModule (Declaration Record')
   = "Record"
+testModule (Declaration RecordDef)
+  = "RecordDef"
 testModule (Declaration Syntax)
   = "Syntax"
 testModule (Declaration PatternSyn)
@@ -552,6 +562,13 @@ testResult n
       ~: Data
     ]
 
+  Declaration DataDef ->
+    [ public (name "D")
+      ~: Data
+    , private (name "x")
+      ~: Variable
+    ]
+
   Declaration Record' ->
     [ public (name "B")
       ~: Record
@@ -561,6 +578,13 @@ testResult n
       ~: Definition
     , public (name "y")
       ~: Definition
+    ]
+
+  Declaration RecordDef ->
+    [ public (name "R")
+      ~: Record
+    , private (name "x")
+      ~: Variable
     ]
 
   Declaration Syntax ->
@@ -722,8 +746,12 @@ testDeclaration
     (testCheck (Declaration FunClause))
   >> it "checks data declarations (Data)"
     (testCheck (Declaration Data'))
+  >> it "checks data definitions (DataDef)"
+    (testCheck (Declaration DataDef))
   >> it "checks record declarations (Record)"
     (testCheck (Declaration Record'))
+  >> it "checks record definitions (RecordDef)"
+    (testCheck (Declaration RecordDef))
   >> it "checks syntax declarations (Syntax)"
     (testCheck (Declaration Syntax))
   >> it "checks pattern synonyms (PatternSyn)"

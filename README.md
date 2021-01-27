@@ -17,6 +17,8 @@ in the project root directory, which specifies the "roots" of the project. The
 within the project itself. You might think of the `.agda-roots` file as a
 specification of the public interface of your project.
 
+Supported Agda versions: `>= 2.6.1 && < 2.6.2`
+
 ## Example
 
 File `~/Test.agda`:

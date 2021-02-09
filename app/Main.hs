@@ -4,17 +4,15 @@ import Agda.Unused.Check
   (checkUnused, checkUnusedLocal)
 import qualified Agda.Unused.Monad.Error
   as E
-import Agda.Unused.Parse
-  (parseConfig)
 import qualified Agda.Unused.Print
   as P
 import Agda.Unused.Types.Name
   (Name(..), NamePart(..), QName(..))
 import Agda.Unused.Utils
-  (liftMaybe, mapLeft)
+  (liftMaybe)
 
 import Control.Monad.Except
-  (MonadError, liftEither, runExceptT, throwError)
+  (MonadError, runExceptT)
 import Control.Monad.IO.Class
   (MonadIO, liftIO)
 import Data.Aeson
@@ -35,13 +33,14 @@ import Data.Text.Lazy
   (toStrict)
 import Options.Applicative
   (InfoMod, Parser, ParserInfo, execParser, fullDesc, header, help, helper,
-    info, long, metavar, optional, progDesc, short, strOption, switch)
+    info, long, metavar, optional, progDesc, short, strArgument, strOption,
+    switch)
 import System.Directory
-  (doesFileExist, getCurrentDirectory, makeAbsolute)
+  (getCurrentDirectory, makeAbsolute)
 import System.Exit
   (exitFailure, exitSuccess)
 import System.FilePath
-  ((</>), splitDirectories, stripExtension, takeDirectory)
+  (splitDirectories, stripExtension)
 import System.IO
   (stderr)
 
@@ -49,31 +48,36 @@ import System.IO
 
 data Options
   = Options
-  { optionsRoot
+  { optionsFile
+    :: !FilePath
+    -- ^ Path of the file to check.
+  , optionsRoot
     :: !(Maybe FilePath)
-    -- ^ The project root path.
-  , optionsFile
-    :: !(Maybe FilePath)
-    -- ^ A file path to check locally.
+    -- ^ Path of the project root directory.
+  , optionsLocal
+    :: !Bool
+    -- ^ Whether to ignore publicly accessible items.
   , optionsJSON
     :: !Bool
-    -- ^ Whether to output JSON.
+    -- ^ Whether to format output as JSON.
   } deriving Show
 
 optionsParser
   :: Parser Options
 optionsParser
   = Options
-  <$> optional (strOption
+  <$> (strArgument
+    $ metavar "FILE"
+    <> help "Path of file to check")
+  <*> optional (strOption
     $ short 'r'
     <> long "root"
     <> metavar "ROOT"
     <> help "Path of project root directory")
-  <*> optional (strOption
+  <*> (switch
     $ short 'l'
     <> long "local"
-    <> metavar "FILE"
-    <> help "Path of file to check locally")
+    <> help "Ignore publicly accessible items")
   <*> (switch
     $ short 'j'
     <> long "json"
@@ -99,10 +103,6 @@ data Error where
     :: !FilePath
     -> Error
 
-  ErrorLocal
-    :: !FilePath
-    -> Error
-
   ErrorParse
     :: !Text
     -> Error
@@ -114,7 +114,7 @@ data Error where
 check
   :: Options
   -> IO ()
-check o@(Options _ _ j)
+check o@(Options _ _ _ j)
   = runExceptT (check' o)
   >>= either (printErrorWith j) (const (pure ()))
 
@@ -124,39 +124,42 @@ check'
   => Options
   -> m ()
 
-check' o@(Options _ Nothing j) = do
+check' (Options f r l j) = do
   rootPath
-    <- liftIO (getRootDirectory o)
-  configPath
-    <- pure (rootPath </> ".agda-roots")
-  exists
-    <- liftIO (doesFileExist configPath)
-  _
-    <- bool (throwError (ErrorFile configPath)) (pure ()) exists
-  contents
-    <- liftIO (I.readFile configPath)
-  roots
-    <- liftEither (mapLeft ErrorParse (parseConfig contents))
-  checkResult
-    <- liftIO (checkUnused rootPath roots)
-  _
-    <- liftIO (printResult j P.printUnused checkResult)
-  pure ()
-
-check' o@(Options _ (Just f) j) = do
-  rootPath
-    <- liftIO (getRootDirectory o)
+    <- maybe (liftIO getCurrentDirectory) pure r
   rootPath'
     <- pure (splitDirectories rootPath)
   filePath
     <- liftIO (makeAbsolute f >>= \f' -> pure (splitDirectories f'))
-  localModule
-    <- liftMaybe (ErrorLocal f) (stripPrefix rootPath' filePath >>= pathModule)
-  checkResult
-    <- liftIO (checkUnusedLocal rootPath localModule)
+  module'
+    <- liftMaybe (ErrorFile f) (stripPrefix rootPath' filePath >>= pathModule)
   _
-    <- liftIO (printResult j P.printUnusedItems checkResult)
+    <- liftIO (bool checkGlobal checkLocal l j rootPath module')
   pure ()
+
+checkGlobal
+  :: Bool
+  -- ^ Whether to format output as JSON.
+  -> FilePath
+  -- ^ The project root path.
+  -> QName
+  -- ^ The module to check.
+  -> IO ()
+checkGlobal j p n
+  = checkUnused True p n
+  >>= printResult j P.printUnused
+
+checkLocal
+  :: Bool
+  -- ^ Whether to format output as JSON.
+  -> FilePath
+  -- ^ The project root path.
+  -> QName
+  -- ^ The module to check.
+  -> IO ()
+checkLocal j p n
+  = checkUnusedLocal p n
+  >>= printResult j P.printUnusedItems
 
 pathModule
   :: [FilePath]
@@ -203,9 +206,7 @@ printError
   :: Error
   -> Text
 printError (ErrorFile p)
-  = "Error: .agda-roots file not found " <> parens (T.pack p) <> "."
-printError (ErrorLocal l)
-  = "Error: Invalid local path " <> parens (T.pack l) <> "."
+  = "Error: Invalid local path " <> parens (T.pack p) <> "."
 printError (ErrorParse t)
   = t
 
@@ -240,45 +241,6 @@ encodeMessage
   -> Value
 encodeMessage t m
   = object ["type" .= t, "message" .= m]
-
--- ## Root
-
-getRootDirectory
-  :: Options
-  -> IO FilePath
-getRootDirectory (Options Nothing Nothing _)
-  = getCurrentDirectory
-  >>= \p -> getRootDirectoryFrom p p
-getRootDirectory (Options Nothing (Just p) _)
-  = makeAbsolute p
-  >>= \p' -> getRootDirectoryFrom (takeDirectory p') (takeDirectory p')
-getRootDirectory (Options (Just p) _ _)
-  = makeAbsolute p
-
--- Search recursively upwards for project root directory.
-getRootDirectoryFrom
-  :: FilePath
-  -- ^ Default directory.
-  -> FilePath
-  -- ^ Starting directory.
-  -> IO FilePath
-getRootDirectoryFrom d p
-  = doesFileExist (p </> ".agda-roots") >>= getRootDirectoryWith d p
-
-getRootDirectoryWith
-  :: FilePath
-  -- ^ Default directory.
-  -> FilePath
-  -- ^ Starting directory.
-  -> Bool
-  -- ^ Whether the starting directory contains an .agda-roots file.
-  -> IO FilePath
-getRootDirectoryWith _ p True
-  = pure p
-getRootDirectoryWith d p False | takeDirectory p == p
-  = pure d
-getRootDirectoryWith d p False
-  = getRootDirectoryFrom d (takeDirectory p)
 
 -- ## Main
 

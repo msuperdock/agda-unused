@@ -3,7 +3,7 @@ cabal-version: 3.0
 name:
   agda-unused
 version:
-  0.2.0
+  1.0.0
 build-type:
   Simple
 license:
@@ -39,13 +39,11 @@ library
     Agda.Unused.Monad.Error
     Agda.Unused.Monad.Reader
     Agda.Unused.Monad.State
-    Agda.Unused.Parse
     Agda.Unused.Print
     Agda.Unused.Types.Access
     Agda.Unused.Types.Context
     Agda.Unused.Types.Name
     Agda.Unused.Types.Range
-    Agda.Unused.Types.Root
     Agda.Unused.Utils
   other-modules:
     Paths_agda_unused

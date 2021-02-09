@@ -26,9 +26,9 @@ import Agda.Unused.Types.Context
     accessContextLookup, accessContextLookupDefining, accessContextLookupModule,
     accessContextLookupSpecial, accessContextMatch, accessContextModule,
     accessContextModule', accessContextUnion, contextDelete,
-    contextDeleteModule, contextItem, contextLookup, contextLookupItem,
-    contextLookupModule, contextModule, contextRanges, fromContext, item,
-    itemConstructor, itemPattern, moduleRanges, toContext)
+    contextDeleteModule, contextItem, contextLookupItem, contextLookupModule,
+    contextModule, contextRanges, fromContext, item, itemConstructor,
+    itemPattern, moduleRanges, toContext)
 import qualified Agda.Unused.Types.Context
   as C
 import Agda.Unused.Types.Name
@@ -36,8 +36,6 @@ import Agda.Unused.Types.Name
     fromQName, fromQNameRange, nameIds, pathQName, qNamePath)
 import Agda.Unused.Types.Range
   (Range'(..), RangeInfo(..), RangeType(..))
-import Agda.Unused.Types.Root
-  (Root(..), Roots(..))
 import Agda.Unused.Utils
   (liftMaybe, mapLeft)
 
@@ -356,28 +354,6 @@ touchQNameWith r n (Left LookupAmbiguous) False
   = throwError (ErrorAmbiguous r n)
 touchQNameWith _ _ rs b
   = touchNameWith rs b
-
-touchQNameContext
-  :: MonadError Error m
-  => MonadReader Environment m
-  => MonadState State m
-  => Context
-  -> QName
-  -> QName
-  -> m ()
-touchQNameContext c m n
-  = maybe (throwError (ErrorRoot m n)) modifyDelete (contextLookup n c)
-
-touchQNamesContext
-  :: MonadError Error m
-  => MonadReader Environment m
-  => MonadState State m
-  => Context
-  -> QName
-  -> [QName]
-  -> m ()
-touchQNamesContext m p
-  = void . traverse (touchQNameContext m p)
 
 touchQName'
   :: MonadError Error m
@@ -1694,7 +1670,8 @@ checkFile
   -> QName
   -> m Context
 checkFile r n
-  = gets (stateLookup n) >>= \s -> checkFileWith s r n
+  = gets (stateLookup n)
+  >>= \s -> checkFileWith s r n
 
 checkFileWith
   :: MonadError Error m
@@ -1762,7 +1739,7 @@ checkFilePath r n p = do
 checkPath
   :: MonadIO m
   => [QName]
-  -- ^ Visited or ignored modules.
+  -- ^ Visited modules.
   -> FilePath
   -- ^ The project root path.
   -> FilePath
@@ -1791,48 +1768,36 @@ checkPathDirectory ms p p'
   >>= traverse (checkPath ms p)
   >>= pure . concat
 
--- ## Roots
-
-checkRoot
-  :: MonadError Error m
-  => MonadReader Environment m
-  => MonadState State m
-  => MonadIO m
-  => Root
-  -> m ()
-checkRoot (Root p Nothing)
-  = checkFile Nothing p
-  >>= touchContext
-checkRoot (Root p (Just ns))
-  = checkFile Nothing p
-  >>= \c -> touchQNamesContext c p ns
-
-checkRoots
-  :: MonadError Error m
-  => MonadReader Environment m
-  => MonadState State m
-  => MonadIO m
-  => [Root]
-  -> m ()
-checkRoots
-  = void . traverse checkRoot
-
 -- ## Main
 
--- | Check an Agda file and its dependencies for unused code.
+-- | Check an Agda file for unused code.
 checkUnused
-  :: FilePath
+  :: Bool
+  -- ^ Whether to ignore publicly accessible items in the main module.
+  -> FilePath
   -- ^ The project root path.
-  -> Roots
-  -- ^ The public entry points for the project.
+  -> QName
+  -- ^ The module to check.
   -> IO (Either Error Unused)
-checkUnused p (Roots rs is)
+checkUnused b p n
   = runExceptT
-  $ checkUnusedItems False p (checkRoots rs)
-  >>= \s -> checkPath (is <> stateModules s) p p
+  $ checkUnusedItems False p (checkUnused' b n)
+  >>= \s -> checkPath (stateModules s) p p
   >>= \fs -> pure (Unused (UnusedItems (stateItems s)) fs)
 
--- | Check an Agda file for unused code.
+checkUnused'
+  :: MonadError Error m
+  => MonadReader Environment m
+  => MonadState State m
+  => MonadIO m
+  => Bool
+  -> QName
+  -> m ()
+checkUnused' b n
+  = checkFile Nothing n
+  >>= bool (const (pure ())) touchContext b
+
+-- | Check an Agda file for unused code, ignoring publicly accessible items.
 checkUnusedLocal
   :: FilePath
   -- ^ The project root path.
@@ -1847,8 +1812,7 @@ checkUnusedLocal p
   . checkFile Nothing
 
 checkUnusedItems
-  :: MonadError Error m
-  => MonadIO m
+  :: Functor m
   => Bool
   -- ^ Whether to use local mode.
   -> FilePath

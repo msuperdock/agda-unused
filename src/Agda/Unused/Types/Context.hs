@@ -20,7 +20,6 @@ module Agda.Unused.Types.Context
     -- ** Lookup
 
   , LookupError(..)
-  , contextLookup
   , contextLookupItem
   , contextLookupModule
   , accessContextLookup
@@ -297,7 +296,6 @@ data LookupError where
 
   deriving Show
 
--- | Get the ranges for the given name, or 'Nothing' if not in context.
 contextLookup
   :: QName
   -> Context

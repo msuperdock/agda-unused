@@ -10,6 +10,13 @@
 - `open` statements
 - pattern synonyms
 
+`agda-unused` takes a filepath representing an Agda module and checks for unused
+code in that module and its dependencies. By default, `agda-unused` does not
+check public items that could be imported elsewhere. But with the `--global`
+flag, `agda-unused` treats the given module as the sole entry point for the
+project, and additionally checks for unused files and unused public items in
+dependencies. (See below for more on the `--global` flag.)
+
 Supported Agda versions: `>= 2.6.1 && < 2.6.2`
 
 ## Example
@@ -53,18 +60,58 @@ Output:
 ## Usage
 
 ```
-Usage: agda-unused FILE [-r|--root ROOT] [-l|--local] [-j|--json]
-  Check for unused code in project with root directory ROOT
+Usage: agda-unused FILE [-r|--root ROOT] [-g|--global] [-j|--json]
+  Check for unused code in FILE
 
 Available options:
   -h,--help                Show this help text
   FILE                     Path of file to check
   -r,--root ROOT           Path of project root directory
-  -l,--local               Ignore publicly accessible items
+  -g,--global              Check public items in dependencies
   -j,--json                Format output as JSON
 ```
 
 If `--root` is not given, we use the current directory as the project root.
+
+## Global
+
+If the `--global` flag is given, we perform a global check, treating the given
+module as the sole entry point for the project. The publicly accessible items in
+the given module, both definitions and re-exports using `public`, are treated as
+the public interface of the project, and will not be marked unused. The publicly
+accessible items in dependencies of the given module may be marked unused,
+unlike the default behavior. We also check for unused files.
+
+To perform a global check on an Agda project, you may want to create a special
+module that imports and re-exports exactly the intended public interface of your
+project. For example:
+
+File `All.agda`:
+
+```
+module All where
+
+open import A public
+  using (f)
+open import B public
+  hiding (g)
+open import C public
+```
+
+Command:
+
+```
+$ agda-unused All.agda --global
+```
+
+## JSON
+
+If the `--json` flag is given, the output is a JSON object with two fields:
+
+- `type`: One of `"none"`, `"unused"`, `"error"`.
+- `message`: A string, the same as the usual output of `agda-unused`.
+
+The `"none"` type indicates that there is no unused code.
 
 ## Approach
 
@@ -79,15 +126,6 @@ considered used, while `h` is considered unused. If we remove `h` and run
 `agda-unsed` again, it will now report that `g` is unused. This behavior is
 different from Haskell's built-in tool, which would report that all three
 identifiers are unused on the first run.
-
-## JSON
-
-If the `--json` switch is given, the output is a JSON object with two fields:
-
-- `type`: One of `"none"`, `"unused"`, `"error"`.
-- `message`: A string, the same as the usual output of `agda-unused`.
-
-The `"none"` type indicates that there is no unused code.
 
 ## Limitations
 

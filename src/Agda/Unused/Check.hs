@@ -5,7 +5,7 @@ Check an Agda project for unused code.
 -}
 module Agda.Unused.Check
   ( checkUnused
-  , checkUnusedLocal
+  , checkUnusedGlobal
   ) where
 
 import Agda.Unused
@@ -14,7 +14,7 @@ import Agda.Unused.Monad.Error
   (Error(..), InternalError(..), UnexpectedError(..), UnsupportedError(..),
     liftLookup)
 import Agda.Unused.Monad.Reader
-  (Environment(..), askLocal, askRoot, askSkip, localSkip)
+  (Environment(..), askGlobal, askRoot, askSkip, localSkip)
 import Agda.Unused.Monad.State
   (ModuleState(..), State, modifyDelete, modifyInsert, stateBlock,
     stateCheck, stateEmpty, stateItems, stateLookup, stateModules)
@@ -1688,14 +1688,14 @@ checkFileWith Nothing r n | isBuiltin n
   >>= \p -> localSkip (checkFilePath r n p)
 
 checkFileWith Nothing r n = do
-  local
-    <- askLocal
+  global
+    <- askGlobal
   rootPath
     <- askRoot
   context
     <- checkFilePath r n (rootPath </> qNamePath n)
   _
-    <- bool (pure ()) (touchContext context) local
+    <- bool (touchContext context) (pure ()) global
   pure context
 
 checkFileWith (Just Blocked) r n
@@ -1770,22 +1770,37 @@ checkPathDirectory ms p p'
 
 -- ## Main
 
--- | Check an Agda file for unused code.
+-- | Check an Agda file and its dependencies for unused code.
 checkUnused
+  :: FilePath
+  -- ^ The project root path.
+  -> QName
+  -- ^ The module to check.
+  -> IO (Either Error UnusedItems)
+checkUnused p
+  = runExceptT
+  . fmap UnusedItems
+  . fmap stateItems
+  . checkUnusedItems False p
+  . checkFile Nothing
+
+-- | Check an Agda file and its dependencies for unused code, including all
+-- public items in dependencies.
+checkUnusedGlobal
   :: Bool
-  -- ^ Whether to ignore publicly accessible items in the main module.
+  -- ^ Whether to check public items in the main module.
   -> FilePath
   -- ^ The project root path.
   -> QName
   -- ^ The module to check.
   -> IO (Either Error Unused)
-checkUnused b p n
+checkUnusedGlobal b p n
   = runExceptT
-  $ checkUnusedItems False p (checkUnused' b n)
+  $ checkUnusedItems True p (checkUnusedGlobal' b n)
   >>= \s -> checkPath (stateModules s) p p
   >>= \fs -> pure (Unused (UnusedItems (stateItems s)) fs)
 
-checkUnused'
+checkUnusedGlobal'
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
@@ -1793,33 +1808,19 @@ checkUnused'
   => Bool
   -> QName
   -> m ()
-checkUnused' b n
+checkUnusedGlobal' b n
   = checkFile Nothing n
-  >>= bool (const (pure ())) touchContext b
-
--- | Check an Agda file for unused code, ignoring publicly accessible items.
-checkUnusedLocal
-  :: FilePath
-  -- ^ The project root path.
-  -> QName
-  -- ^ The module to check.
-  -> IO (Either Error UnusedItems)
-checkUnusedLocal p
-  = runExceptT
-  . fmap UnusedItems
-  . fmap stateItems
-  . checkUnusedItems True p
-  . checkFile Nothing
+  >>= bool touchContext (const (pure ())) b
 
 checkUnusedItems
   :: Functor m
   => Bool
-  -- ^ Whether to use local mode.
+  -- ^ Whether to perform a global check.
   -> FilePath
   -> ReaderT Environment (StateT State m) a
   -> m State
-checkUnusedItems l p
+checkUnusedItems g p
   = fmap snd
   . flip runStateT stateEmpty
-  . flip runReaderT (Environment False l p)
+  . flip runReaderT (Environment False g p)
 

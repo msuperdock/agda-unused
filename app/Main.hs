@@ -1,7 +1,7 @@
 module Main where
 
 import Agda.Unused.Check
-  (checkUnused, checkUnusedLocal)
+  (checkUnused, checkUnusedGlobal)
 import qualified Agda.Unused.Monad.Error
   as E
 import qualified Agda.Unused.Print
@@ -54,9 +54,9 @@ data Options
   , optionsRoot
     :: !(Maybe FilePath)
     -- ^ Path of the project root directory.
-  , optionsLocal
+  , optionsGlobal
     :: !Bool
-    -- ^ Whether to ignore publicly accessible items.
+    -- ^ Whether to check public items in dependencies.
   , optionsJSON
     :: !Bool
     -- ^ Whether to format output as JSON.
@@ -75,9 +75,9 @@ optionsParser
     <> metavar "ROOT"
     <> help "Path of project root directory")
   <*> (switch
-    $ short 'l'
-    <> long "local"
-    <> help "Ignore publicly accessible items")
+    $ short 'g'
+    <> long "global"
+    <> help "Check public items in dependencies")
   <*> (switch
     $ short 'j'
     <> long "json"
@@ -87,7 +87,7 @@ optionsInfo
   :: InfoMod a
 optionsInfo
   = fullDesc
-  <> progDesc "Check for unused code in project with root directory ROOT"
+  <> progDesc "Check for unused code in FILE"
   <> header "agda-unused - check for unused code in an Agda project"
 
 options
@@ -124,7 +124,7 @@ check'
   => Options
   -> m ()
 
-check' (Options f r l j) = do
+check' (Options f r g j) = do
   rootPath
     <- maybe (liftIO getCurrentDirectory) pure r
   rootPath'
@@ -134,20 +134,8 @@ check' (Options f r l j) = do
   module'
     <- liftMaybe (ErrorFile f) (stripPrefix rootPath' filePath >>= pathModule)
   _
-    <- liftIO (bool checkGlobal checkLocal l j rootPath module')
+    <- liftIO (bool checkLocal checkGlobal g j rootPath module')
   pure ()
-
-checkGlobal
-  :: Bool
-  -- ^ Whether to format output as JSON.
-  -> FilePath
-  -- ^ The project root path.
-  -> QName
-  -- ^ The module to check.
-  -> IO ()
-checkGlobal j p n
-  = checkUnused True p n
-  >>= printResult j P.printUnused
 
 checkLocal
   :: Bool
@@ -158,8 +146,20 @@ checkLocal
   -- ^ The module to check.
   -> IO ()
 checkLocal j p n
-  = checkUnusedLocal p n
+  = checkUnused p n
   >>= printResult j P.printUnusedItems
+
+checkGlobal
+  :: Bool
+  -- ^ Whether to format output as JSON.
+  -> FilePath
+  -- ^ The project root path.
+  -> QName
+  -- ^ The module to check.
+  -> IO ()
+checkGlobal j p n
+  = checkUnusedGlobal True p n
+  >>= printResult j P.printUnused
 
 pathModule
   :: [FilePath]

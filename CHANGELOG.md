@@ -6,10 +6,10 @@ Initial release.
 
 ## 1.0.0 (Feb. 2021)
 
-- Remove `.agda-roots` file; a global check now takes a filename representing an
-  Agda module and ignores all items publicly accessible from that module.
+- Remove support for `.agda-roots` file. A global check now takes a filename
+  representing an Agda module and ignores all public items in that module.
+- Replace the `--local` option with a `--global` flag; default to a local check.
 - The `agda-unused` command now takes a filename as a positional argument.
-- The `-l` or `--local` is now a flag, rather than an option taking an argument.
 - Check variables in standalone data & record definitions.
 - Check renaming directives simultaneously (fixes bug).
 

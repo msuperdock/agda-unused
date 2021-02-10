@@ -15,15 +15,20 @@ module Agda.Unused.Types.Range
     -- * Interface
 
   , getRange
+  , rangeName
   , rangeContains
 
   ) where
 
 import Agda.Unused.Types.Name
-  (QName)
+  (QName, pathQName)
 
 import Agda.Syntax.Position
   (PositionWithoutFile, Range, Range'(..), getRange, rEnd', rStart')
+import Agda.Utils.FileName
+  (filePath)
+import qualified Agda.Utils.Maybe.Strict
+  as S
 
 -- ## Definitions
 
@@ -85,6 +90,17 @@ data RangeInfo where
   deriving (Eq, Ord, Show)
 
 -- ## Interface
+
+-- | Get the module name associated with the given range.
+rangeName
+  :: FilePath
+  -- ^ The project root path.
+  -> Range
+  -> Maybe QName
+rangeName p (Range (S.Just p') _)
+  = pathQName p (filePath p')
+rangeName _ _
+  = Nothing
 
 -- | Determine whether the first range contains the second.
 rangeContains

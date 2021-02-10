@@ -35,7 +35,7 @@ import Agda.Unused.Types.Name
   (Name(..), QName(..), isBuiltin, fromAsName, fromName, fromNameRange,
     fromQName, fromQNameRange, nameIds, pathQName, qNamePath)
 import Agda.Unused.Types.Range
-  (Range'(..), RangeInfo(..), RangeType(..))
+  (Range'(..), RangeInfo(..), RangeType(..), rangeName)
 import Agda.Unused.Utils
   (liftMaybe, mapLeft)
 
@@ -69,7 +69,7 @@ import Agda.Utils.FileName
 import Control.Monad
   (foldM, void)
 import Control.Monad.Except
-  (MonadError, liftEither, runExceptT, throwError)
+  (ExceptT, MonadError, liftEither, runExceptT, throwError)
 import Control.Monad.IO.Class
   (MonadIO, liftIO)
 import Control.Monad.Reader
@@ -1814,7 +1814,7 @@ checkUnused p
   = runExceptT
   . fmap UnusedItems
   . fmap stateItems
-  . checkUnusedItems False p
+  . runUnusedT False p
   . checkFile False Nothing
 
 -- | Check an Agda file and its dependencies for unused code, including all
@@ -1828,20 +1828,42 @@ checkUnusedGlobal
   -- ^ The module to check.
   -> IO (Either Error Unused)
 checkUnusedGlobal b p n
-  = runExceptT
-  $ checkUnusedItems True p (checkFile b Nothing n)
-  >>= \s -> checkPath (stateModules s) p p
-  >>= \fs -> pure (Unused (UnusedItems (stateItems s)) fs)
+  = runExceptT (checkUnusedGlobal' b p n)
 
-checkUnusedItems
+checkUnusedGlobal'
+  :: MonadIO m
+  => Bool
+  -> FilePath
+  -> QName
+  -> ExceptT Error m Unused
+checkUnusedGlobal' b p n = do
+  state
+    <- runUnusedT True p (checkFile b Nothing n)
+  items 
+    <- pure (bool id (filter (not . inScope p n)) b (stateItems state))
+  files
+    <- checkPath (stateModules state) p p
+  pure (Unused (UnusedItems items) files)
+
+runUnusedT
   :: Functor m
   => Bool
   -- ^ Whether to perform a global check.
   -> FilePath
   -> ReaderT Environment (StateT State m) a
   -> m State
-checkUnusedItems g p
+runUnusedT g p
   = fmap snd
   . flip runStateT stateEmpty
   . flip runReaderT (Environment False g p)
+
+inScope
+  :: FilePath
+  -> QName
+  -> (Range, RangeInfo)
+  -> Bool
+inScope _ _ (_, RangeNamed RangeVariable _)
+  = False
+inScope p n (r, _)
+  = rangeName p r == Just n
 

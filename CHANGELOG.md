@@ -10,6 +10,7 @@ Initial release.
   representing an Agda module and ignores all public items in that module.
 - Replace the `--local` option with a `--global` flag; default to a local check.
 - The `agda-unused` command now takes a filename as a positional argument.
+- Use `.agda-lib` file to infer the root directory if not given.
 - Check variables in standalone data & record definitions.
 - Check renaming directives simultaneously (fixes bug).
 

@@ -17,10 +17,10 @@ import Agda.Unused.Types.Range
 -- | A collection of unused items and files.
 data Unused
   = Unused
-  { unusedItems
-    :: UnusedItems
-  , unusedPaths
+  { unusedFiles
     :: [FilePath]
+  , unusedItems
+    :: UnusedItems
   } deriving Show
 
 -- | A collection of unused items.

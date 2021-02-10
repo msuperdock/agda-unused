@@ -85,14 +85,14 @@ printMessage
   -> Text
   -> Text
 printMessage t1 t2
-  = T.unlines [t1, t2]
+  = T.intercalate "\n" [t1, t2]
 
 printMessageIndent
   :: Text
   -> Text
   -> Text
 printMessageIndent t1 t2
-  = T.unlines [t1, indent t2]
+  = T.intercalate "\n" [t1, indent t2]
 
 -- ## Errors
 
@@ -191,10 +191,10 @@ printUnsupportedError UnsupportedUnquote
 printUnused
   :: Unused
   -> Maybe Text
-printUnused (Unused is ps)
+printUnused (Unused ps is)
   = printUnusedWith
+    (printUnusedFiles ps)
     (printUnusedItems is)
-    (printUnusedPaths ps)
 
 printUnusedWith
   :: Maybe Text
@@ -207,20 +207,20 @@ printUnusedWith Nothing (Just t2)
 printUnusedWith (Just t1) Nothing
   = Just t1
 printUnusedWith (Just t1) (Just t2)
-  = Just (t2 <> t1)
+  = Just (T.intercalate "\n" [t1, t2])
     
-printUnusedPaths
+printUnusedFiles
   :: [FilePath]
   -> Maybe Text
-printUnusedPaths []
+printUnusedFiles []
   = Nothing
-printUnusedPaths ps@(_ : _)
-  = Just (mconcat (printUnusedPath <$> ps))
+printUnusedFiles ps@(_ : _)
+  = Just (T.intercalate "\n" (printUnusedFile <$> ps))
 
-printUnusedPath
+printUnusedFile
   :: FilePath
   -> Text
-printUnusedPath p
+printUnusedFile p
   = printMessageIndent (T.pack p) "unused file"
 
 -- | Print a collection of unused items.
@@ -230,13 +230,13 @@ printUnusedItems
 printUnusedItems (UnusedItems [])
   = Nothing
 printUnusedItems (UnusedItems rs@(_ : _))
-  = Just (foldMap (uncurry printRangeInfoWith) rs)
+  = Just (T.intercalate "\n" (uncurry printRangeInfoWith <$> rs))
 
 -- | Print a message indicating that no unused code was found.
 printNothing
   :: Text
 printNothing
-  = T.unlines ["No unused code."]
+  = "No unused code."
 
 printRangeInfoWith
   :: Range

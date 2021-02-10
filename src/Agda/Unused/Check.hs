@@ -1839,11 +1839,11 @@ checkUnusedGlobal'
 checkUnusedGlobal' b p n = do
   state
     <- runUnusedT True p (checkFile b Nothing n)
-  items 
-    <- pure (bool id (filter (not . inScope p n)) b (stateItems state))
   files
     <- checkPath (stateModules state) p p
-  pure (Unused (UnusedItems items) files)
+  items 
+    <- pure (bool id (filter (not . inScope p n)) b (stateItems state))
+  pure (Unused files (UnusedItems items))
 
 runUnusedT
   :: Functor m

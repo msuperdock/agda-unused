@@ -71,7 +71,12 @@ Available options:
   -j,--json                Format output as JSON
 ```
 
-If `--root` is not given, we use the current directory as the project root.
+The project root directory is determined as follows:
+
+- If the `--root` option is given, its value is the project root.
+- Otherwise, the nearest ancestor of the current directory with an `.agda-lib`
+  file is the project root, if any.
+- Otherwise, we take the current directory as the project root.
 
 ## Global
 

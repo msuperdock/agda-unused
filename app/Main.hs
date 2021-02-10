@@ -36,11 +36,11 @@ import Options.Applicative
     info, long, metavar, optional, progDesc, short, strArgument, strOption,
     switch)
 import System.Directory
-  (getCurrentDirectory, makeAbsolute)
+  (getCurrentDirectory, listDirectory, makeAbsolute)
 import System.Exit
   (exitFailure, exitSuccess)
 import System.FilePath
-  (splitDirectories, stripExtension)
+  (isExtensionOf, splitDirectories, stripExtension, takeDirectory)
 import System.IO
   (stderr)
 
@@ -126,7 +126,7 @@ check'
 
 check' (Options f r g j) = do
   rootPath
-    <- maybe (liftIO getCurrentDirectory) pure r
+    <- liftIO (getRootDirectory r)
   rootPath'
     <- pure (splitDirectories rootPath)
   filePath
@@ -241,6 +241,44 @@ encodeMessage
   -> Value
 encodeMessage t m
   = object ["type" .= t, "message" .= m]
+
+-- ## Root
+
+getRootDirectory
+  :: Maybe FilePath
+  -> IO FilePath
+getRootDirectory Nothing
+  = getCurrentDirectory
+  >>= \p -> getRootDirectoryFrom p p
+getRootDirectory (Just r)
+  = pure r
+
+-- Search recursively upwards for project root directory.
+getRootDirectoryFrom
+  :: FilePath
+  -- ^ Default directory.
+  -> FilePath
+  -- ^ Starting directory.
+  -> IO FilePath
+getRootDirectoryFrom d p
+  = listDirectory p
+  >>= pure . any (isExtensionOf "agda-lib")
+  >>= getRootDirectoryWith d p
+
+getRootDirectoryWith
+  :: FilePath
+  -- ^ Default directory.
+  -> FilePath
+  -- ^ Starting directory.
+  -> Bool
+  -- ^ Whether the starting directory contains an .agda-lib file.
+  -> IO FilePath
+getRootDirectoryWith _ p True
+  = pure p
+getRootDirectoryWith d p False | takeDirectory p == p
+  = pure d
+getRootDirectoryWith d p False
+  = getRootDirectoryFrom d (takeDirectory p)
 
 -- ## Main
 

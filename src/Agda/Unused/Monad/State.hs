@@ -15,14 +15,17 @@ module Agda.Unused.Monad.State
   , stateEmpty
   , stateItems
   , stateModules
-  , stateBlock
-  , stateCheck
-  , stateLookup
+
+    -- * Get
+
+  , getModule
 
     -- * Modify
 
-  , modifyDelete
   , modifyInsert
+  , modifyDelete
+  , modifyBlock
+  , modifyCheck
 
   ) where
 
@@ -40,13 +43,15 @@ import Agda.Unused.Utils
 import Control.Monad.Reader
   (MonadReader)
 import Control.Monad.State
-  (MonadState, modify)
+  (MonadState, gets, modify)
 import Data.Bool
   (bool)
 import Data.Map.Strict
   (Map)
 import qualified Data.Map.Strict
   as Map
+
+-- ## Definitions
 
 -- | Cache the results of checking modules. This allows us to:
 -- 
@@ -73,6 +78,8 @@ data State
     :: !(Map QName ModuleState)
     -- ^ States for each module dependency.
   } deriving Show
+
+-- ## Interface
 
 -- | Construct an empty state.
 stateEmpty
@@ -130,30 +137,39 @@ stateDelete
 stateDelete rs (State rs' ms)
   = State (mapDeletes rs rs') ms
 
--- | Lookup the state of a module.
-stateLookup
+stateModule
   :: QName
   -> State
   -> Maybe ModuleState
-stateLookup m (State _ ms)
-  = Map.lookup m ms
+stateModule n (State _ ms)
+  = Map.lookup n ms
 
--- | Mark that we are beginning to check a module.
 stateBlock
   :: QName
   -> State
   -> State
-stateBlock m (State rs ms)
-  = State rs (Map.insert m Blocked ms)
+stateBlock n (State rs ms)
+  = State rs (Map.insert n Blocked ms)
 
--- | Record the results of checking a module.
 stateCheck
   :: QName
   -> Context
   -> State
   -> State
-stateCheck m c (State rs ms)
-  = State rs (Map.insert m (Checked c) ms)
+stateCheck n c (State rs ms)
+  = State rs (Map.insert n (Checked c) ms)
+
+-- ## Get
+
+-- | Get the state of a module.
+getModule
+  :: MonadState State m
+  => QName
+  -> m (Maybe ModuleState)
+getModule n
+  = gets (stateModule n)
+
+-- ## Modify
 
 -- | Record a new unused item.
 modifyInsert
@@ -173,4 +189,21 @@ modifyDelete
   -> m ()
 modifyDelete rs
   = askSkip >>= bool (modify (stateDelete rs)) (pure ())
+
+-- | Mark that we are beginning to check a module.
+modifyBlock
+  :: MonadState State m
+  => QName
+  -> m ()
+modifyBlock n
+  = modify (stateBlock n)
+
+-- | Record the results of checking a module.
+modifyCheck
+  :: MonadState State m
+  => QName
+  -> Context
+  -> m ()
+modifyCheck n c
+  = modify (stateCheck n c)
 

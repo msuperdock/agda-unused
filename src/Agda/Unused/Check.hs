@@ -16,8 +16,8 @@ import Agda.Unused.Monad.Error
 import Agda.Unused.Monad.Reader
   (Environment(..), askGlobal, askRoot, askSkip, localSkip)
 import Agda.Unused.Monad.State
-  (ModuleState(..), State, modifyDelete, modifyInsert, stateBlock,
-    stateCheck, stateEmpty, stateItems, stateLookup, stateModules)
+  (ModuleState(..), State, getModule, modifyBlock, modifyCheck, modifyDelete,
+    modifyInsert, stateEmpty, stateItems, stateModules)
 import Agda.Unused.Types.Access
   (Access(..), fromAccess)
 import Agda.Unused.Types.Context
@@ -75,7 +75,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader
   (MonadReader, ReaderT, runReaderT)
 import Control.Monad.State
-  (MonadState, StateT, gets, modify, runStateT)
+  (MonadState, StateT, runStateT)
 import Data.Bool
   (bool)
 import qualified Data.Map.Strict
@@ -1670,7 +1670,7 @@ checkFile
   -> QName
   -> m Context
 checkFile r n
-  = gets (stateLookup n)
+  = getModule n
   >>= \s -> checkFileWith s r n
 
 checkFileWith
@@ -1714,7 +1714,7 @@ checkFilePath
   -> m Context
 checkFilePath r n p = do
   _
-    <- modify (stateBlock n)
+    <- modifyBlock n
   absolutePath
     <- pure (AbsolutePath (T.pack p))
   exists
@@ -1730,7 +1730,7 @@ checkFilePath r n p = do
   context
     <- checkModule module'
   _
-    <- modify (stateCheck n context)
+    <- modifyCheck n context
   pure context
 
 -- ## Paths

@@ -91,8 +91,10 @@ rangeContains
   :: Range
   -> Range
   -> Bool
-rangeContains r1 r2
+rangeContains r1@(Range f1 _) r2@(Range f2 _) | f1 == f2
   = rangeContains' (rStart' r1) (rEnd' r1) (rStart' r2) (rEnd' r2)
+rangeContains _ _
+  = False
 
 rangeContains'
   :: Maybe PositionWithoutFile

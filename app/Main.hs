@@ -158,7 +158,7 @@ checkGlobal
   -- ^ The module to check.
   -> IO ()
 checkGlobal j p n
-  = checkUnusedGlobal True p n
+  = checkUnusedGlobal False p n
   >>= printResult j P.printUnused
 
 pathModule

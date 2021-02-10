@@ -177,7 +177,7 @@ testCheck n = do
   unused
     <- checkUnused path module'
   unusedGlobal
-    <- checkUnusedGlobal True path module'
+    <- checkUnusedGlobal False path module'
   _
     <- testUnused unused (mapMaybe privateMay (testResult n))
   _

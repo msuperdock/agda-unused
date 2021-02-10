@@ -25,10 +25,10 @@ import Agda.Unused.Types.Context
     accessContextDefine, accessContextImport, accessContextItem,
     accessContextLookup, accessContextLookupDefining, accessContextLookupModule,
     accessContextLookupSpecial, accessContextMatch, accessContextModule,
-    accessContextModule', accessContextUnion, contextDelete,
-    contextDeleteModule, contextItem, contextLookupItem, contextLookupModule,
-    contextModule, contextRanges, fromContext, item, itemConstructor,
-    itemPattern, moduleRanges, toContext)
+    accessContextModule', accessContextRanges, accessContextUnion,
+    contextDelete, contextDeleteModule, contextItem, contextLookupItem,
+    contextLookupModule, contextModule, contextRanges, fromContext, item,
+    itemConstructor, itemPattern, moduleRanges, toContext)
 import qualified Agda.Unused.Types.Context
   as C
 import Agda.Unused.Types.Name
@@ -1051,11 +1051,13 @@ checkDeclarationsTop
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => AccessContext
+  => Bool
+  -- ^ Whether to touch items in scope in the main module.
+  -> AccessContext
   -> [Declaration]
   -> m AccessContext
-checkDeclarationsTop
-  = checkDeclarationsWith checkNiceDeclarationsTop
+checkDeclarationsTop b
+  = checkDeclarationsWith (checkNiceDeclarationsTop b)
 
 checkDeclarationsWith
   :: MonadError Error m
@@ -1089,7 +1091,7 @@ checkNiceDeclaration _ _ (NiceField r _ _ _ _ _ _)
 checkNiceDeclaration fs c (PrimitiveFunction _ a _ n e)
   = checkExpr c e >> checkName' False fs (fromAccess a) RangeDefinition n
 checkNiceDeclaration _ c (NiceModule r a _ (N.QName n) bs ds)
-  = checkNiceModule c (fromAccess a) r (fromName n) bs ds
+  = checkNiceModule False c (fromAccess a) r (fromName n) bs ds
 checkNiceDeclaration _ _ (NiceModule _ _ _ n@(N.Qual _ _) _ _)
   = throwError (ErrorInternal ErrorName (getRange n))
 checkNiceDeclaration _ _ (NicePragma _ _)
@@ -1188,25 +1190,25 @@ checkNiceDeclaration _ c (NiceOpen r n i)
 
 checkNiceDeclaration _ _ (NiceImport r n Nothing DontOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
-  >>= \n' -> checkFile (Just r) n'
+  >>= \n' -> checkFile False (Just r) n'
   >>= \c' -> checkImportDirective Import r n' c' i
   >>= \c'' -> pure (accessContextImport n' c'')
 checkNiceDeclaration _ _ (NiceImport r n Nothing DoOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
-  >>= \n' -> checkFile (Just r) n'
+  >>= \n' -> checkFile False (Just r) n'
   >>= \c' -> checkImportDirective Import r n' c' i
   >>= \c'' -> pure (accessContextImport n' c'
     <> fromContext (importDirectiveAccess i) c'')
 checkNiceDeclaration _ _ (NiceImport r n (Just a) DontOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a)) (fromAsName a)
-  >>= \a' -> checkFile (Just r) n'
+  >>= \a' -> checkFile False (Just r) n'
   >>= \c' -> checkImportDirective Import r n' c' i
   >>= \c'' -> checkModuleName c'' Public (getRange a) a'
 checkNiceDeclaration _ _ (NiceImport r n (Just a) DoOpen i)
   = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
   >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a)) (fromAsName a)
-  >>= \a' -> checkFile (Just r) n'
+  >>= \a' -> checkFile False (Just r) n'
   >>= \c' -> checkImportDirective Import r n' c' i
   >>= \c'' -> checkModuleName c' Public (getRange a) a'
   >>= \c''' -> pure (c''' <> fromContext (importDirectiveAccess i) c'')
@@ -1307,17 +1309,18 @@ checkNiceDeclarationsTop
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => Fixities
+  => Bool
+  -- ^ Whether to touch items in scope in the main module.
+  -> Fixities
   -> AccessContext
   -> [NiceDeclaration]
   -> m AccessContext
-checkNiceDeclarationsTop _ _ []
-  = pure mempty
-checkNiceDeclarationsTop _ c (NiceModule r a _ _ bs ds : _)
-  = checkNiceModule c (fromAccess a) r Nothing bs ds
-checkNiceDeclarationsTop fs c (d : ds)
-  = checkNiceDeclaration fs c d
-  >>= \c' -> checkNiceDeclarations fs (c <> c') ds
+checkNiceDeclarationsTop b _ c (NiceModule r a _ _ bs ds : _)
+  = checkNiceModule b c (fromAccess a) r Nothing bs ds
+checkNiceDeclarationsTop b fs c ds
+  = checkNiceDeclarations fs c ds
+  >>= \c' -> touchAccessContextIf b c'
+  >> pure c'
 
 checkNiceSig
   :: MonadError Error m
@@ -1445,7 +1448,9 @@ checkNiceModule
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => AccessContext
+  => Bool
+  -- ^ Whether to touch items in scope in the main module.
+  -> AccessContext
   -> Access
   -> Range
   -> Maybe Name
@@ -1453,10 +1458,11 @@ checkNiceModule
   -> [TypedBinding]
   -> [Declaration]
   -> m AccessContext
-checkNiceModule c a r n bs ds
+checkNiceModule b c a r n bs ds
   = checkTypedBindings True c bs
   >>= \c' -> checkDeclarations (c <> c') ds
-  >>= \c'' -> pure (toContext c'')
+  >>= \c'' -> touchAccessContextIf b c''
+  >> pure (toContext c'')
   >>= \c''' -> maybe (pure (fromContext a c''')) (checkModuleName c''' a r) n
 
 -- ## Imports
@@ -1639,6 +1645,25 @@ touchContext
 touchContext c
   = modifyDelete (contextRanges c)
 
+touchAccessContext
+  :: MonadReader Environment m
+  => MonadState State m
+  => AccessContext
+  -> m ()
+touchAccessContext c
+  = modifyDelete (accessContextRanges c)
+
+touchAccessContextIf
+  :: MonadReader Environment m
+  => MonadState State m
+  => Bool
+  -> AccessContext
+  -> m ()
+touchAccessContextIf False _
+  = pure ()
+touchAccessContextIf True c
+  = touchAccessContext c
+
 importDirectiveAccess
   :: ImportDirective
   -> Access
@@ -1654,10 +1679,12 @@ checkModule
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => Module
+  => Bool
+  -- ^ Whether to touch items in scope in the main module.
+  -> Module
   -> m Context
-checkModule (_, ds)
-  = toContext <$> checkDeclarationsTop mempty ds
+checkModule b (_, ds)
+  = toContext <$> checkDeclarationsTop b mempty ds
 
 -- ## Files
 
@@ -1666,41 +1693,45 @@ checkFile
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => Maybe Range
+  => Bool
+  -- ^ Whether to touch items in scope in the main module.
+  -> Maybe Range
   -> QName
   -> m Context
-checkFile r n
+checkFile b r n
   = getModule n
-  >>= \s -> checkFileWith s r n
+  >>= checkFileWith b r n
 
 checkFileWith
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => Maybe ModuleState
+  => Bool
+  -- ^ Whether to touch items in scope in the main module.
   -> Maybe Range
   -> QName
+  -> Maybe ModuleState
   -> m Context
 
-checkFileWith Nothing r n | isBuiltin n
+checkFileWith b r n Nothing | isBuiltin n
   = liftIO (getDataFileName ("data" </> qNamePath n))
-  >>= \p -> localSkip (checkFilePath r n p)
+  >>= \p -> localSkip (checkFilePath b r n p)
 
-checkFileWith Nothing r n = do
+checkFileWith b r n Nothing = do
   global
     <- askGlobal
   rootPath
     <- askRoot
   context
-    <- checkFilePath r n (rootPath </> qNamePath n)
+    <- checkFilePath b r n (rootPath </> qNamePath n)
   _
     <- bool (touchContext context) (pure ()) global
   pure context
 
-checkFileWith (Just Blocked) r n
+checkFileWith _ r n (Just Blocked)
   = throwError (ErrorCyclic r n)
-checkFileWith (Just (Checked c)) _ _
+checkFileWith _ _ _ (Just (Checked c))
   = pure c
 
 checkFilePath
@@ -1708,11 +1739,13 @@ checkFilePath
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => Maybe Range
+  => Bool
+  -- ^ Whether to touch items in scope in the main module.
+  -> Maybe Range
   -> QName
   -> FilePath
   -> m Context
-checkFilePath r n p = do
+checkFilePath b r n p = do
   _
     <- modifyBlock n
   absolutePath
@@ -1728,7 +1761,7 @@ checkFilePath r n p = do
   (module', _)
     <- liftEither (mapLeft ErrorParse parseResult)
   context
-    <- checkModule module'
+    <- checkModule b module'
   _
     <- modifyCheck n context
   pure context
@@ -1782,13 +1815,13 @@ checkUnused p
   . fmap UnusedItems
   . fmap stateItems
   . checkUnusedItems False p
-  . checkFile Nothing
+  . checkFile False Nothing
 
 -- | Check an Agda file and its dependencies for unused code, including all
 -- public items in dependencies.
 checkUnusedGlobal
   :: Bool
-  -- ^ Whether to check public items in the main module.
+  -- ^ Whether to touch items in scope in the main module.
   -> FilePath
   -- ^ The project root path.
   -> QName
@@ -1796,21 +1829,9 @@ checkUnusedGlobal
   -> IO (Either Error Unused)
 checkUnusedGlobal b p n
   = runExceptT
-  $ checkUnusedItems True p (checkUnusedGlobal' b n)
+  $ checkUnusedItems True p (checkFile b Nothing n)
   >>= \s -> checkPath (stateModules s) p p
   >>= \fs -> pure (Unused (UnusedItems (stateItems s)) fs)
-
-checkUnusedGlobal'
-  :: MonadError Error m
-  => MonadReader Environment m
-  => MonadState State m
-  => MonadIO m
-  => Bool
-  -> QName
-  -> m ()
-checkUnusedGlobal' b n
-  = checkFile Nothing n
-  >>= bool touchContext (const (pure ())) b
 
 checkUnusedItems
   :: Functor m

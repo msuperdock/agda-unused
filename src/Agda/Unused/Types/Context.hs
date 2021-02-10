@@ -45,6 +45,7 @@ module Agda.Unused.Types.Context
 
   , moduleRanges
   , contextRanges
+  , accessContextRanges
 
     -- ** Match
 
@@ -546,6 +547,14 @@ contextRanges
 contextRanges (Context is ms)
   = concat (itemRanges <$> Map.elems is)
   <> concat (moduleRanges <$> Map.elems ms)
+
+-- | Get all ranges associated with names in the given access context.
+accessContextRanges
+  :: AccessContext
+  -> [Range]
+accessContextRanges c@(AccessContext _ _ js)
+  = contextRanges (toContext' c)
+  <> concat (contextRanges <$> Map.elems js)
 
 -- ### Match
 

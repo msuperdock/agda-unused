@@ -13,9 +13,9 @@
 `agda-unused` takes a filepath representing an Agda module and checks for unused
 code in that module and its dependencies. By default, `agda-unused` does not
 check public items that could be imported elsewhere. But with the `--global`
-flag, `agda-unused` treats the given module as the sole entry point for the
-project, and additionally checks for unused files and unused public items in
-dependencies. (See below for more on the `--global` flag.)
+flag, `agda-unused` treats the given module as a full description of the public
+interface of the project, and additionally checks for unused files and unused
+public items in dependencies. (See below for more on the `--global` flag.)
 
 Supported Agda versions: `>= 2.6.1 && < 2.6.2`
 
@@ -80,27 +80,25 @@ The project root directory is determined as follows:
 
 ## Global
 
-If the `--global` flag is given, we perform a global check, treating the given
-module as the sole entry point for the project. The publicly accessible items in
-the given module, both definitions and re-exports using `public`, are treated as
-the public interface of the project, and will not be marked unused. The publicly
+If the `--global` flag is given, we perform a global check. That is, the items
+in scope in the given module, both definitions and imports, are treated as the
+public interface of the project, and will not be marked unused. The publicly
 accessible items in dependencies of the given module may be marked unused,
 unlike the default behavior. We also check for unused files.
 
-To perform a global check on an Agda project, you may want to create a special
-module that imports and re-exports exactly the intended public interface of your
-project. For example:
+To perform a global check on an Agda project, you may want to create a module
+that imports exactly the intended public interface of your project. For example:
 
 File `All.agda`:
 
 ```
 module All where
 
-open import A public
+import A
   using (f)
-open import B public
+import B
   hiding (g)
-open import C public
+import C
 ```
 
 Command:

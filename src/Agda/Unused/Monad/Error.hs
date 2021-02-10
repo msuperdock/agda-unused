@@ -202,7 +202,7 @@ instance (Monad m, MonadError Error m) => MonadFixityError m where
   warnPolarityPragmasButNotPostulates _
     = pure ()
 
--- ## Lookup
+-- ## Lift
 
 -- | Lift a lookup result to our error monad.
 liftLookup

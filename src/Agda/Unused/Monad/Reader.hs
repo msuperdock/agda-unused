@@ -24,6 +24,8 @@ module Agda.Unused.Monad.Reader
 import Control.Monad.Reader
   (MonadReader, ask, local)
 
+-- ## Definition
+
 -- | An environment type for use in a reader monad.
 data Environment
   = Environment
@@ -37,6 +39,8 @@ data Environment
     :: !FilePath
     -- ^ The project root path.
   } deriving Show
+
+-- ## Ask
 
 -- | Ask whether to skip checking names.
 askSkip
@@ -58,6 +62,8 @@ askRoot
   => m FilePath
 askRoot
   = environmentRoot <$> ask
+
+-- ## Local
 
 -- | Skip checking names in a local computation.
 localSkip

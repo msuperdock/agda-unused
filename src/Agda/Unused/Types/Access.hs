@@ -22,6 +22,8 @@ module Agda.Unused.Types.Access
 import qualified Agda.Syntax.Common
   as C
 
+-- ## Definition
+
 -- | An access modifier.
 data Access where
 
@@ -33,6 +35,8 @@ data Access where
 
   deriving Show
 
+-- ## Interface
+
 -- | Elimination rule for 'Access'.
 access
   :: a
@@ -43,6 +47,8 @@ access x _ Private
   = x
 access _ y Public
   = y
+
+-- ## Conversion
 
 -- | Conversion from Agda access type.
 fromAccess

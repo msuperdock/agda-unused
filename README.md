@@ -67,16 +67,16 @@ Available options:
   -h,--help                Show this help text
   FILE                     Path of file to check
   -r,--root ROOT           Path of project root directory
-  -g,--global              Check public items in dependencies
+  -g,--global              Check project globally
   -j,--json                Format output as JSON
 ```
 
 The project root directory is determined as follows:
 
 - If the `--root` option is given, its value is the project root.
-- Otherwise, the nearest ancestor of the current directory with an `.agda-lib`
-  file is the project root, if any.
-- Otherwise, we take the current directory as the project root.
+- Otherwise, the nearest ancestor directory of `FILE` containing an `.agda-lib`
+ file is the project root, if any.
+- Otherwise, the parent directory of `FILE` is the project root.
 
 ## Global
 

@@ -22,7 +22,7 @@ import Options.Applicative
     info, long, metavar, optional, progDesc, short, strArgument, strOption,
     switch)
 import System.Directory
-  (getCurrentDirectory, listDirectory)
+  (listDirectory)
 import System.Exit
   (exitFailure, exitSuccess)
 import System.FilePath
@@ -86,8 +86,8 @@ options
 check
   :: Options
   -> IO ()
-check o@(Options _ r _ _)
-  = getRootDirectory r
+check o@(Options f r _ _)
+  = getRootDirectory r f
   >>= checkWith o
 
 checkWith
@@ -143,11 +143,11 @@ encodeMessage t m
 
 getRootDirectory
   :: Maybe FilePath
+  -> FilePath
   -> IO FilePath
-getRootDirectory Nothing
-  = getCurrentDirectory
-  >>= \p -> getRootDirectoryFrom p p
-getRootDirectory (Just r)
+getRootDirectory Nothing p
+  = getRootDirectoryFrom p p
+getRootDirectory (Just r) _
   = pure r
 
 -- Search recursively upwards for project root directory.

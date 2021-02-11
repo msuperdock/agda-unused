@@ -13,8 +13,6 @@ import Data.Aeson.Text
   (encodeToLazyText)
 import Data.Text
   (Text)
-import qualified Data.Text
-  as T
 import qualified Data.Text.IO
   as I
 import Data.Text.Lazy
@@ -83,20 +81,6 @@ options
 options
   = info (helper <*> optionsParser) optionsInfo
 
--- ## Errors
-
-data Error where
- 
-  ErrorFile
-    :: !FilePath
-    -> Error
-
-  ErrorParse
-    :: !Text
-    -> Error
-
-  deriving Show
-
 -- ## Check
 
 check
@@ -132,38 +116,6 @@ printResult False p (Right x)
 printResult True p x
   = I.putStrLn (toStrict (encodeToLazyText (printResultJSON p x)))
 
-printErrorWith
-  :: Bool
-  -- ^ Whether to output JSON.
-  -> Error
-  -> IO ()
-printErrorWith False e
-  = I.hPutStrLn stderr (printError e) >> exitFailure
-printErrorWith True e
-  = I.putStrLn (toStrict (encodeToLazyText (printErrorJSON e)))
-
-printError
-  :: Error
-  -> Text
-printError (ErrorFile p)
-  = "Error: Invalid local path " <> parens (T.pack p) <> "."
-printError (ErrorParse t)
-  = t
-
-parens
-  :: Text
-  -> Text
-parens t
-  = "(" <> t <> ")"
-
--- ## JSON
-
-printErrorJSON
-  :: Error
-  -> Value
-printErrorJSON e
-  = encodeMessage "error" (printError e)
-
 printResultJSON
   :: (a -> Maybe Text)
   -> Either E.Error a
@@ -180,7 +132,12 @@ encodeMessage
   -- ^ Contents of message.
   -> Value
 encodeMessage t m
-  = object ["type" .= t, "message" .= m]
+  = object
+  [ "type"
+    .= t
+  , "message"
+    .= m
+  ]
 
 -- ## Root
 

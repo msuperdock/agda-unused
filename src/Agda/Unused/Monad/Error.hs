@@ -70,6 +70,11 @@ data Error where
     :: !(Maybe Range)
     -> Error
 
+  -- | Illegal declaration in main module of global check.
+  ErrorGlobal
+    :: !Range
+    -> Error
+
   -- | Internal error; should be reported.
   ErrorInternal
     :: !InternalError

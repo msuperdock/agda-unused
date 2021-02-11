@@ -1,11 +1,13 @@
 module Main where
 
 import Agda.Unused
-  (Unused(..), UnusedItems(..))
+  (UnusedItems(..))
 import Agda.Unused.Check
-  (checkUnused, checkUnusedGlobal)
+  (checkUnused, checkUnusedWith)
 import Agda.Unused.Monad.Error
   (Error)
+import Agda.Unused.Monad.Reader
+  (Mode(..))
 import Agda.Unused.Print
   (printUnusedItems)
 import Agda.Unused.Types.Access
@@ -174,14 +176,14 @@ testCheck n = do
     <- testPath n
   module'
     <- pure (name (testModule n))
-  unused
-    <- checkUnused path module'
+  unusedLocal
+    <- checkUnusedWith Local path module'
   unusedGlobal
-    <- checkUnusedGlobal False path module'
+    <- checkUnusedWith Global path module'
   _
-    <- testUnused unused (mapMaybe privateMay (testResult n))
+    <- testUnused unusedLocal (mapMaybe privateMay (testResult n))
   _
-    <- testUnused (unusedItems <$> unusedGlobal) (snd <$> testResult n)
+    <- testUnused unusedGlobal (snd <$> testResult n)
   pure ()
 
 testCheckExample

@@ -10,10 +10,10 @@
 - `open` statements
 - pattern synonyms
 
-`agda-unused` takes a filepath representing an Agda module and checks for unused
-code in that module and its dependencies. By default, `agda-unused` does not
-check public items that could be imported elsewhere. But with the `--global`
-flag, `agda-unused` treats the given module as a full description of the public
+`agda-unused` takes a filepath representing an Agda code file and checks for
+unused code in that file and its dependencies. By default, `agda-unused` does
+not check public items that could be imported elsewhere. But with the `--global`
+flag, `agda-unused` treats the given file as a description of the public
 interface of the project, and additionally checks for unused files and unused
 public items in dependencies. (See below for more on the `--global` flag.)
 
@@ -80,14 +80,14 @@ The project root directory is determined as follows:
 
 ## Global
 
-If the `--global` flag is given, we perform a global check. That is, the items
-in scope in the given module, both definitions and imports, are treated as the
-public interface of the project, and will not be marked unused. The publicly
-accessible items in dependencies of the given module may be marked unused,
-unlike the default behavior. We also check for unused files.
+If the `--global` flag is given, all declarations in the given file must be
+imports. The set of imported items is treated as the public interface of the
+project; these items will not be marked unused. The public items in dependencies
+of the given module may be marked unused, unlike the default behavior. We also
+check for unused files.
 
-To perform a global check on an Agda project, you may want to create a module
-that imports exactly the intended public interface of your project. For example:
+To perform a global check on an Agda project, first create a file that imports
+exactly the intended public interface of your project. For example:
 
 File `All.agda`:
 

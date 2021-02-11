@@ -113,6 +113,9 @@ printError (ErrorFile r n p)
 printError (ErrorFixity (Just r))
   = printMessage (printRange r)
   $ "Error: Multiple fixity declarations."
+printError (ErrorGlobal r)
+  = printMessage (printRange r)
+  $ "Error: With --global, all declarations in the given file must be imports."
 printError (ErrorInternal e r)
   = printMessage (printRange r)
   $ "Internal error: " <> printInternalError e

@@ -6,23 +6,11 @@ import qualified Agda.Unused.Monad.Error
   as E
 import qualified Agda.Unused.Print
   as P
-import Agda.Unused.Types.Name
-  (Name(..), NamePart(..), QName(..))
-import Agda.Unused.Utils
-  (liftMaybe)
 
-import Control.Monad.Except
-  (MonadError, runExceptT)
-import Control.Monad.IO.Class
-  (MonadIO, liftIO)
 import Data.Aeson
   (Value(..), (.=), object)
 import Data.Aeson.Text
   (encodeToLazyText)
-import Data.Bool
-  (bool)
-import Data.List
-  (stripPrefix)
 import Data.Text
   (Text)
 import qualified Data.Text
@@ -36,11 +24,11 @@ import Options.Applicative
     info, long, metavar, optional, progDesc, short, strArgument, strOption,
     switch)
 import System.Directory
-  (getCurrentDirectory, listDirectory, makeAbsolute)
+  (getCurrentDirectory, listDirectory)
 import System.Exit
   (exitFailure, exitSuccess)
 import System.FilePath
-  (isExtensionOf, splitDirectories, stripExtension, takeDirectory)
+  (isExtensionOf, takeDirectory)
 import System.IO
   (stderr)
 
@@ -114,68 +102,20 @@ data Error where
 check
   :: Options
   -> IO ()
-check o@(Options _ _ _ j)
-  = runExceptT (check' o)
-  >>= either (printErrorWith j) (const (pure ()))
+check o@(Options _ r _ _)
+  = getRootDirectory r
+  >>= checkWith o
 
-check'
-  :: MonadError Error m
-  => MonadIO m
-  => Options
-  -> m ()
-
-check' (Options f r g j) = do
-  rootPath
-    <- liftIO (getRootDirectory r)
-  rootPath'
-    <- pure (splitDirectories rootPath)
-  filePath
-    <- liftIO (makeAbsolute f >>= \f' -> pure (splitDirectories f'))
-  module'
-    <- liftMaybe (ErrorFile f) (stripPrefix rootPath' filePath >>= pathModule)
-  _
-    <- liftIO (bool checkLocal checkGlobal g j rootPath module')
-  pure ()
-
-checkLocal
-  :: Bool
-  -- ^ Whether to format output as JSON.
+checkWith
+  :: Options
   -> FilePath
-  -- ^ The project root path.
-  -> QName
-  -- ^ The module to check.
   -> IO ()
-checkLocal j p n
-  = checkUnused p n
+checkWith (Options f _ False j) r
+  = checkUnused r f
   >>= printResult j P.printUnusedItems
-
-checkGlobal
-  :: Bool
-  -- ^ Whether to format output as JSON.
-  -> FilePath
-  -- ^ The project root path.
-  -> QName
-  -- ^ The module to check.
-  -> IO ()
-checkGlobal j p n
-  = checkUnusedGlobal p n
+checkWith (Options f _ True j) r
+  = checkUnusedGlobal r f
   >>= printResult j P.printUnused
-
-pathModule
-  :: [FilePath]
-  -> Maybe QName
-pathModule []
-  = Nothing
-pathModule (p : [])
-  = QName . name <$> stripExtension "agda" p
-pathModule (p : ps@(_ : _))
-  = Qual (name p) <$> pathModule ps
-
-name
-  :: String
-  -> Name
-name p
-  = Name [Id p]
 
 -- ## Print
 

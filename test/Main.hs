@@ -28,7 +28,7 @@ import Data.Text
 import qualified Data.Text
   as T
 import System.FilePath
-  ((</>))
+  ((</>), (<.>))
 import Test.Hspec
   (Expectation, Spec, describe, expectationFailure, hspec, it, shouldBe,
     shouldSatisfy)
@@ -171,28 +171,30 @@ public n
 testCheck
   :: Test
   -> Expectation
-testCheck n = do
-  path
-    <- testPath n
-  module'
-    <- pure (name (testModule n))
+testCheck t = do
+  rootPath
+    <- testRootPath t
+  filePath
+    <- testFilePath t
   unusedLocal
-    <- checkUnusedWith Local path module'
+    <- checkUnusedWith Local rootPath filePath
   unusedGlobal
-    <- checkUnusedWith Global path module'
+    <- checkUnusedWith Global rootPath filePath
   _
-    <- testUnused unusedLocal (mapMaybe privateMay (testResult n))
+    <- testUnused unusedLocal (mapMaybe privateMay (testResult t))
   _
-    <- testUnused unusedGlobal (snd <$> testResult n)
+    <- testUnused unusedGlobal (snd <$> testResult t)
   pure ()
 
 testCheckExample
   :: Expectation
 testCheckExample = do
-  path
+  rootPath
     <- getDataFileName "data/test/example"
+  filePath
+    <- getDataFileName "data/test/example/Test.agda"
   unused
-    <- checkUnused path (name "Test")
+    <- checkUnused rootPath filePath
   _
     <- testUnusedExample unused
   pure ()
@@ -365,81 +367,87 @@ testDir (Expression _)
 testDir (Declaration _)
   = "declaration"
 
-testPath
+testRootPath
   :: Test
   -> IO FilePath
-testPath n
-  = getDataFileName ("data/test" </> testDir n)
+testRootPath t
+  = getDataFileName ("data/test" </> testDir t)
 
-testModule
+testFilePath
+  :: Test
+  -> IO FilePath
+testFilePath t
+  = getDataFileName ("data/test" </> testDir t </> testFileName t <.> "agda")
+
+testFileName
   :: Test
   -> String
-testModule (Pattern IdentP)
+testFileName (Pattern IdentP)
   = "IdentP"
-testModule (Pattern OpAppP)
+testFileName (Pattern OpAppP)
   = "OpAppP"
-testModule (Pattern AsP)
+testFileName (Pattern AsP)
   = "AsP"
-testModule (Expression WithApp)
+testFileName (Expression WithApp)
   = "WithApp"
-testModule (Expression Lam)
+testFileName (Expression Lam)
   = "Lam"
-testModule (Expression ExtendedLam)
+testFileName (Expression ExtendedLam)
   = "ExtendedLam"
-testModule (Expression Pi)
+testFileName (Expression Pi)
   = "Pi"
-testModule (Expression Let)
+testFileName (Expression Let)
   = "Let"
-testModule (Expression DoBlock1)
+testFileName (Expression DoBlock1)
   = "DoBlock1"
-testModule (Expression DoBlock2)
+testFileName (Expression DoBlock2)
   = "DoBlock2"
-testModule (Expression DoBlock3)
+testFileName (Expression DoBlock3)
   = "DoBlock3"
-testModule (Expression DoBlock4)
+testFileName (Expression DoBlock4)
   = "DoBlock4"
-testModule (Declaration TypeSig)
+testFileName (Declaration TypeSig)
   = "TypeSig"
-testModule (Declaration FunClause)
+testFileName (Declaration FunClause)
   = "FunClause"
-testModule (Declaration Data')
+testFileName (Declaration Data')
   = "Data"
-testModule (Declaration DataDef)
+testFileName (Declaration DataDef)
   = "DataDef"
-testModule (Declaration Record')
+testFileName (Declaration Record')
   = "Record"
-testModule (Declaration RecordDef)
+testFileName (Declaration RecordDef)
   = "RecordDef"
-testModule (Declaration Syntax)
+testFileName (Declaration Syntax)
   = "Syntax"
-testModule (Declaration PatternSyn)
+testFileName (Declaration PatternSyn)
   = "PatternSyn"
-testModule (Declaration Mutual1)
+testFileName (Declaration Mutual1)
   = "Mutual1"
-testModule (Declaration Mutual2)
+testFileName (Declaration Mutual2)
   = "Mutual2"
-testModule (Declaration Abstract)
+testFileName (Declaration Abstract)
   = "Abstract"
-testModule (Declaration Private')
+testFileName (Declaration Private')
   = "Private"
-testModule (Declaration Postulate')
+testFileName (Declaration Postulate')
   = "Postulate"
-testModule (Declaration Open1)
+testFileName (Declaration Open1)
   = "Open1"
-testModule (Declaration Open2)
+testFileName (Declaration Open2)
   = "Open2"
-testModule (Declaration Import')
+testFileName (Declaration Import')
   = "Import"
-testModule (Declaration ModuleMacro)
+testFileName (Declaration ModuleMacro)
   = "ModuleMacro"
-testModule (Declaration Module')
+testFileName (Declaration Module')
   = "Module"
 
 testResult
   :: Test
   -> [(Access, RangeInfo)]
-testResult n
-  = case n of
+testResult t
+  = case t of
 
   Pattern IdentP ->
     [ private (name "y")

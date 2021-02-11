@@ -13,7 +13,7 @@ module Agda.Unused.Monad.Reader
     -- * Ask
 
   , askSkip
-  , askGlobal
+  , askLocal
   , askGlobalMain
   , askRoot
 
@@ -76,12 +76,12 @@ askSkip
 askSkip
   = (== Skip) <$> askMode
 
--- | Ask whether we are in global mode.
-askGlobal
+-- | Ask whether we are in local mode.
+askLocal
   :: MonadReader Environment m
   => m Bool
-askGlobal
-  = (== Global) <$> askMode
+askLocal
+  = (== Local) <$> askMode
 
 -- | Ask whether we are in global main mode.
 askGlobalMain

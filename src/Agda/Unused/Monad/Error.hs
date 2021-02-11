@@ -61,7 +61,7 @@ data Error where
   -- | File not found.
   ErrorFile
     :: !(Maybe Range)
-    -> !QName
+    -> !(Maybe QName)
     -> !FilePath
     -> Error
 

@@ -15,7 +15,7 @@ import Agda.Unused.Monad.Error
   (Error(..), InternalError(..), UnexpectedError(..), UnsupportedError(..),
     liftLookup)
 import Agda.Unused.Monad.Reader
-  (Environment(..), Mode(..), askGlobal, askGlobalMain, askRoot, askSkip,
+  (Environment(..), Mode(..), askGlobalMain, askLocal, askRoot, askSkip,
     localGlobal, localSkip)
 import Agda.Unused.Monad.State
   (ModuleState(..), State, getModule, modifyBlock, modifyCheck, modifyDelete,
@@ -37,7 +37,7 @@ import Agda.Unused.Types.Name
   (Name(..), QName(..), isBuiltin, fromAsName, fromName, fromNameRange,
     fromQName, fromQNameRange, nameIds, pathQName, qNamePath)
 import Agda.Unused.Types.Range
-  (Range'(..), RangeInfo(..), RangeType(..), rangeName)
+  (Range'(..), RangeInfo(..), RangeType(..), rangePath)
 import Agda.Unused.Utils
   (liftMaybe, mapLeft)
 
@@ -87,7 +87,7 @@ import Data.Maybe
 import qualified Data.Text
   as T
 import System.Directory
-  (doesDirectoryExist, doesFileExist, listDirectory)
+  (doesDirectoryExist, doesFileExist, listDirectory, makeAbsolute)
 import System.FilePath
   ((</>))
 
@@ -1727,19 +1727,10 @@ checkFileWith
 
 checkFileWith r n Nothing | isBuiltin n
   = liftIO (getDataFileName ("data" </> qNamePath n))
-  >>= \p -> localSkip (checkFilePath r n p)
-
-checkFileWith r n Nothing = do
-  global
-    <- askGlobal
-  rootPath
-    <- askRoot
-  context
-    <- checkFilePath r n (rootPath </> qNamePath n)
-  _
-    <- bool (touchContext context) (pure ()) global
-  pure context
-
+  >>= \p -> localSkip (checkFilePath r (Just n) p)
+checkFileWith r n Nothing
+  = askRoot
+  >>= \p -> checkFilePath r (Just n) (p </> qNamePath n)
 checkFileWith r n (Just Blocked)
   = throwError (ErrorCyclic r n)
 checkFileWith _ _ (Just (Checked c))
@@ -1751,12 +1742,14 @@ checkFilePath
   => MonadState State m
   => MonadIO m
   => Maybe Range
-  -> QName
+  -> Maybe QName
   -> FilePath
   -> m Context
 checkFilePath r n p = do
+  local
+    <- askLocal
   _
-    <- modifyBlock n
+    <- maybe (pure ()) modifyBlock n
   absolutePath
     <- pure (AbsolutePath (T.pack p))
   exists
@@ -1772,7 +1765,9 @@ checkFilePath r n p = do
   context
     <- checkModule module'
   _
-    <- modifyCheck n context
+    <- maybe (pure ()) (flip modifyCheck context) n
+  _
+    <- bool (pure ()) (touchContext context) local
   pure context
 
 -- ## Paths
@@ -1812,63 +1807,85 @@ checkPathDirectory ms p p'
 
 -- ## Main
 
--- | Check an Agda module and its dependencies for unused code, excluding public
+-- | Check an Agda file and its dependencies for unused code, excluding public
 -- items that could be imported elsewhere.
 checkUnused
   :: FilePath
-  -- ^ The project root path.
-  -> QName
-  -- ^ The module to check.
+  -- ^ The project root path (absolute, or relative to current directory).
+  -> FilePath
+  -- ^ The file to check (absolute, or relative to current directory).
   -> IO (Either Error UnusedItems)
 checkUnused
   = checkUnusedWith Local
 
--- | Check an Agda module and its dependencies for unused code, using the
+-- | Check an Agda file and its dependencies for unused code, using the
 -- specified check mode.
 checkUnusedWith
   :: Mode
   -- ^ The check mode to use.
   -> FilePath
-  -- ^ The project root path.
-  -> QName
-  -- ^ The module to check.
+  -- ^ The project root path (absolute, or relative to current directory).
+  -> FilePath
+  -- ^ The file to check (absolute, or relative to current directory).
   -> IO (Either Error UnusedItems)
-checkUnusedWith m p
+checkUnusedWith m
+  = withAbsolute (checkUnusedWith' m)
+
+checkUnusedWith'
+  :: Mode
+  -> FilePath
+  -> FilePath
+  -> IO (Either Error UnusedItems)
+checkUnusedWith' m p
   = runExceptT
   . fmap UnusedItems
   . fmap stateItems
   . runUnusedT m p
-  . checkFile Nothing
+  . checkFilePath Nothing Nothing
 
--- | Check an Agda module and its dependencies for unused code, including public
+-- | Check an Agda file and its dependencies for unused code, including public
 -- items in dependencies, as well as files.
 --
--- The given module should consist only of import statements; it serves as a
+-- The given file should consist only of import statements; it serves as a
 -- full description of the public interface of the project.
 checkUnusedGlobal
   :: FilePath
-  -- ^ The project root path.
-  -> QName
-  -- ^ The module to check.
+  -- ^ The project root path (absolute, or relative to current directory).
+  -> FilePath
+  -- ^ The file to check (absolute, or relative to current directory).
   -> IO (Either Error Unused)
-checkUnusedGlobal p n
-  = runExceptT (checkUnusedGlobal' p n)
+checkUnusedGlobal
+  = withAbsolute (\p p' -> runExceptT (checkUnusedGlobal' p p'))
 
 checkUnusedGlobal'
   :: MonadIO m
   => FilePath
-  -> QName
+  -> FilePath
   -> ExceptT Error m Unused
-checkUnusedGlobal' p n = do
+checkUnusedGlobal' p p' = do
   state
-    <- runUnusedT GlobalMain p (checkFile Nothing n)
+    <- runUnusedT GlobalMain p (checkFilePath Nothing Nothing p')
   files
     <- checkPath (stateModules state) p p
   items 
-    <- pure (UnusedItems (filter (not . inModule p n) (stateItems state)))
+    <- pure (UnusedItems (filter (not . inFile p') (stateItems state)))
   unused
     <- pure (Unused files items)
   pure unused
+
+withAbsolute
+  :: (FilePath -> FilePath -> IO a)
+  -> FilePath
+  -> FilePath
+  -> IO a
+withAbsolute f p p' = do
+  rootPath
+    <- makeAbsolute p
+  filePath
+    <- makeAbsolute p'
+  result
+    <- f rootPath filePath
+  pure result
 
 runUnusedT
   :: Functor m
@@ -1881,11 +1898,10 @@ runUnusedT m p
   . flip runStateT stateEmpty
   . flip runReaderT (Environment m p)
 
-inModule
+inFile
   :: FilePath
-  -> QName
   -> (Range, RangeInfo)
   -> Bool
-inModule p n (r, _)
-  = rangeName p r == Just n
+inFile p (r, _)
+  = rangePath r == Just p
 

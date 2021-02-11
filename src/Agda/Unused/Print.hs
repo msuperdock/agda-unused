@@ -107,9 +107,12 @@ printError (ErrorAmbiguous r n)
 printError (ErrorCyclic r n)
   = printMessage (maybe (printQName n) printRange r)
   $ "Error: Cyclic module dependency " <> parens (printQName n) <> "."
-printError (ErrorFile r n p)
-  = printMessage (maybe (printQName n) printRange r)
-  $ "Error: File not found " <> parens (T.pack p) <> "."
+printError (ErrorFile (Just r) _ p)
+  = printMessage (printRange r)
+  $ printErrorFile p
+printError (ErrorFile _ (Just n) p)
+  = printMessage (printQName n)
+  $ printErrorFile p
 printError (ErrorFixity (Just r))
   = printMessage (printRange r)
   $ "Error: Multiple fixity declarations."
@@ -132,6 +135,8 @@ printError (ErrorUnsupported e r)
   = printMessage (printRange r)
   $ "Error: " <> printUnsupportedError e <> " not supported."
 
+printError (ErrorFile Nothing Nothing p)
+  = printErrorFile p
 printError (ErrorFixity Nothing)
   = "Error: Multiple fixity declarations."
 printError (ErrorPolarity Nothing)
@@ -141,6 +146,12 @@ printError (ErrorDeclaration e)
   = printRange (getRange e) <> "\n" <> T.pack (prettyShow e)
 printError (ErrorParse e)
   = T.pack (show e)
+
+printErrorFile
+  :: FilePath
+  -> Text
+printErrorFile p
+  = "Error: File not found " <> parens (T.pack p) <> "."
 
 printInternalError
   :: InternalError

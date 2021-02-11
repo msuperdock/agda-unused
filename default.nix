@@ -1,5 +1,5 @@
 { mkDerivation, aeson, Agda, base, containers, directory, filepath
-, hspec, megaparsec, mtl, optparse-applicative, stdenv, text
+, hspec, mtl, optparse-applicative, stdenv, text
 }:
 mkDerivation {
   pname = "agda-unused";
@@ -9,7 +9,7 @@ mkDerivation {
   isExecutable = true;
   enableSeparateDataOutput = true;
   libraryHaskellDepends = [
-    Agda base containers directory filepath megaparsec mtl text
+    Agda base containers directory filepath mtl text
   ];
   executableHaskellDepends = [
     aeson base directory filepath mtl optparse-applicative text

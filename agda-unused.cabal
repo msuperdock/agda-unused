@@ -79,14 +79,11 @@ executable agda-unused
     aeson >= 1.4.7 && < 1.6,
     directory >= 1.3.6 && < 1.4,
     filepath >= 1.4.2 && < 1.5,
-    mtl >= 2.2.2 && < 2.3,
     optparse-applicative >= 0.15.1 && < 0.16,
     text >= 1.2.4 && < 1.3
   default-language:
     Haskell2010
   default-extensions:
-    FlexibleContexts,
-    GADTs,
     OverloadedStrings
   ghc-options:
     -Wall

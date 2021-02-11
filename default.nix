@@ -12,7 +12,7 @@ mkDerivation {
     Agda base containers directory filepath mtl text
   ];
   executableHaskellDepends = [
-    aeson base directory filepath mtl optparse-applicative text
+    aeson base directory filepath optparse-applicative text
   ];
   testHaskellDepends = [ base containers filepath hspec text ];
   description = "Check for unused code in an Agda project";

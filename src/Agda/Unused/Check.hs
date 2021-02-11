@@ -69,7 +69,7 @@ import Agda.Syntax.Position
 import Agda.Utils.FileName
   (AbsolutePath(..))
 import Control.Monad
-  (foldM, void)
+  (foldM, unless, void, when)
 import Control.Monad.Except
   (ExceptT, MonadError, liftEither, runExceptT, throwError)
 import Control.Monad.IO.Class
@@ -80,6 +80,8 @@ import Control.Monad.State
   (MonadState, StateT, runStateT)
 import Data.Bool
   (bool)
+import Data.Foldable
+  (traverse_)
 import qualified Data.Map.Strict
   as Map
 import Data.Maybe
@@ -365,7 +367,7 @@ touchQName'
   -> N.QName
   -> m ()
 touchQName' c n
-  = maybe (pure ()) (uncurry (touchQName c)) (fromQNameRange n)
+  = traverse_ (uncurry (touchQName c)) (fromQNameRange n)
 
 -- ## Bindings
 
@@ -657,7 +659,7 @@ checkExpr c (Generalized e)
 
 checkExpr c (Let _ ds e)
   = checkDeclarations c ds
-  >>= \c' -> maybe (pure ()) (checkExpr (c <> c')) e
+  >>= \c' -> traverse_ (checkExpr (c <> c')) e
 
 checkExprs
   :: MonadError Error m
@@ -777,7 +779,7 @@ checkModuleAssignment
   -> m ()
 checkModuleAssignment c a@(ModuleAssignment n es _)
   = checkExprs c es
-  >> maybe (pure ()) (touchModule c (getRange a)) (fromQName n)
+  >> traverse_ (touchModule c (getRange a)) (fromQName n)
 
 -- ## Definitions
 
@@ -975,8 +977,8 @@ checkDoStmts
   -> [DoStmt]
   -> m AccessContext
 checkDoStmts c ss
-  = bool (pure ()) (touchName c bind) (hasBind ss)
-  >> bool (pure ()) (touchName c bind_) (hasBind_ ss)
+  = when (hasBind ss) (touchName c bind)
+  >> when (hasBind_ ss) (touchName c bind_)
   >> checkFold checkDoStmt c ss
 
 hasBind
@@ -1539,14 +1541,12 @@ checkImportDirective
   -> ImportDirective
   -> m Context
 checkImportDirective dt r n c (ImportDirective _ UseEverything hs rs _)
-  = maybe (pure ()) (\t -> modifyInsert r (RangeNamed t n))
-    (directiveStatement dt)
+  = traverse_ (\t -> modifyInsert r (RangeNamed t n)) (directiveStatement dt)
   >> modifyHidings c (hs <> (renFrom <$> rs))
   >>= \c' -> checkRenamings dt c rs
   >>= \c'' -> contextInsertRangeAll r (c' <> c'')
 checkImportDirective dt r n c (ImportDirective _ (Using ns) _ rs _)
-  = maybe (pure ()) (\t -> modifyInsert r (RangeNamed t n))
-    (directiveStatement dt)
+  = traverse_ (\t -> modifyInsert r (RangeNamed t n)) (directiveStatement dt)
   >> checkImportedNames dt c ns
   >>= \c' -> checkRenamings dt c rs
   >>= \c'' -> contextInsertRangeAll r (c' <> c'')
@@ -1749,13 +1749,13 @@ checkFilePath r n p = do
   local
     <- askLocal
   _
-    <- maybe (pure ()) modifyBlock n
+    <- traverse_ modifyBlock n
   absolutePath
     <- pure (AbsolutePath (T.pack p))
   exists
     <- liftIO (doesFileExist p)
   _
-    <- bool (throwError (ErrorFile r n p)) (pure ()) exists
+    <- unless exists (throwError (ErrorFile r n p))
   contents
     <- liftIO (readFile p)
   (parseResult, _)
@@ -1765,9 +1765,9 @@ checkFilePath r n p = do
   context
     <- checkModule module'
   _
-    <- maybe (pure ()) (flip modifyCheck context) n
+    <- traverse_ (flip modifyCheck context) n
   _
-    <- bool (pure ()) (touchContext context) local
+    <- when local (touchContext context)
   pure context
 
 -- ## Paths

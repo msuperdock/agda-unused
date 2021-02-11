@@ -40,12 +40,12 @@ import Agda.Unused.Types.Range
 import Agda.Unused.Utils
   (mapDeletes)
 
+import Control.Monad
+  (unless)
 import Control.Monad.Reader
   (MonadReader)
 import Control.Monad.State
   (MonadState, gets, modify)
-import Data.Bool
-  (bool)
 import Data.Map.Strict
   (Map)
 import qualified Data.Map.Strict
@@ -179,7 +179,7 @@ modifyInsert
   -> RangeInfo
   -> m ()
 modifyInsert r i
-  = askSkip >>= bool (modify (stateInsert r i)) (pure ())
+  = askSkip >>= flip unless (modify (stateInsert r i))
 
 -- | Mark a list of items as used.
 modifyDelete
@@ -188,7 +188,7 @@ modifyDelete
   => [Range]
   -> m ()
 modifyDelete rs
-  = askSkip >>= bool (modify (stateDelete rs)) (pure ())
+  = askSkip >>= flip unless (modify (stateDelete rs))
 
 -- | Mark that we are beginning to check a module.
 modifyBlock

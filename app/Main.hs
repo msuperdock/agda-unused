@@ -56,7 +56,7 @@ data Options
     -- ^ Path of the project root directory.
   , optionsGlobal
     :: !Bool
-    -- ^ Whether to check public items in dependencies.
+    -- ^ Whether to check project globally.
   , optionsJSON
     :: !Bool
     -- ^ Whether to format output as JSON.
@@ -77,7 +77,7 @@ optionsParser
   <*> (switch
     $ short 'g'
     <> long "global"
-    <> help "Check public items in dependencies")
+    <> help "Check project globally")
   <*> (switch
     $ short 'j'
     <> long "json"

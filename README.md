@@ -132,7 +132,12 @@ identifiers are unused on the first run.
 
 ## Limitations
 
-We currently do not support the following Agda features:
+We do not distinguish between overloaded constructors; if a constructor is used,
+we mark all constructors in scope with the same name as used. This is because
+`agda-unused` works with Agda's concrete syntax; to give more accurate results,
+we would need to use Agda's type-checker, which comes with a performance cost.
+
+Additionally, we currently do not support the following Agda features:
 
 - [record module instance applications](https://agda.readthedocs.io/en/v2.6.1.3/language/module-system.html#parameterised-modules)
 - [unquoting declarations](https://agda.readthedocs.io/en/v2.6.1.3/language/reflection.html#id3)

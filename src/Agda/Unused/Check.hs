@@ -89,7 +89,7 @@ import Data.Maybe
 import qualified Data.Text
   as T
 import System.Directory
-  (doesDirectoryExist, doesFileExist, listDirectory, makeAbsolute)
+  (doesDirectoryExist, doesFileExist, listDirectory)
 import System.FilePath
   ((</>))
 
@@ -1811,9 +1811,9 @@ checkPathDirectory ms p p'
 -- items that could be imported elsewhere.
 checkUnused
   :: FilePath
-  -- ^ The project root path (absolute, or relative to current directory).
+  -- ^ Absolute path of the project root directory.
   -> FilePath
-  -- ^ The file to check (absolute, or relative to current directory).
+  -- ^ Absolute path of the file to check.
   -> IO (Either Error UnusedItems)
 checkUnused
   = checkUnusedWith Local
@@ -1824,19 +1824,11 @@ checkUnusedWith
   :: Mode
   -- ^ The check mode to use.
   -> FilePath
-  -- ^ The project root path (absolute, or relative to current directory).
+  -- ^ Absolute path of the project root directory.
   -> FilePath
-  -- ^ The file to check (absolute, or relative to current directory).
+  -- ^ Absolute path of the file to check.
   -> IO (Either Error UnusedItems)
-checkUnusedWith m
-  = withAbsolute (checkUnusedWith' m)
-
-checkUnusedWith'
-  :: Mode
-  -> FilePath
-  -> FilePath
-  -> IO (Either Error UnusedItems)
-checkUnusedWith' m p
+checkUnusedWith m p
   = runExceptT
   . fmap UnusedItems
   . fmap stateItems
@@ -1850,12 +1842,12 @@ checkUnusedWith' m p
 -- full description of the public interface of the project.
 checkUnusedGlobal
   :: FilePath
-  -- ^ The project root path (absolute, or relative to current directory).
+  -- ^ Absolute path of the project root directory.
   -> FilePath
-  -- ^ The file to check (absolute, or relative to current directory).
+  -- ^ Absolute path of the file to check.
   -> IO (Either Error Unused)
-checkUnusedGlobal
-  = withAbsolute (\p p' -> runExceptT (checkUnusedGlobal' p p'))
+checkUnusedGlobal p p'
+  = runExceptT (checkUnusedGlobal' p p')
 
 checkUnusedGlobal'
   :: MonadIO m
@@ -1872,20 +1864,6 @@ checkUnusedGlobal' p p' = do
   unused
     <- pure (Unused files items)
   pure unused
-
-withAbsolute
-  :: (FilePath -> FilePath -> IO a)
-  -> FilePath
-  -> FilePath
-  -> IO a
-withAbsolute f p p' = do
-  rootPath
-    <- makeAbsolute p
-  filePath
-    <- makeAbsolute p'
-  result
-    <- f rootPath filePath
-  pure result
 
 runUnusedT
   :: Functor m

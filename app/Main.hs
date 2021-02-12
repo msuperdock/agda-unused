@@ -86,20 +86,30 @@ options
 check
   :: Options
   -> IO ()
-check o@(Options f r _ _)
-  = makeAbsolute f
-  >>= getRootDirectory r
-  >>= checkWith o
+check (Options f r g j) = do
+  filePath
+    <- makeAbsolute f
+  rootPath
+    <- getRootDirectory r filePath
+  _
+    <- checkWith rootPath filePath g j
+  pure ()
 
 checkWith
-  :: Options
+  :: FilePath
+  -- ^ Absolute path of the project root.
   -> FilePath
+  -- ^ Absolute path of the file to check.
+  -> Bool
+  -- ^ Whether to check project globally.
+  -> Bool
+  -- ^ Whether to format output as JSON.
   -> IO ()
-checkWith (Options f _ False j) r
-  = checkUnused r f
+checkWith p p' False j
+  = checkUnused p p'
   >>= printResult j P.printUnusedItems
-checkWith (Options f _ True j) r
-  = checkUnusedGlobal r f
+checkWith p p' True j
+  = checkUnusedGlobal p p'
   >>= printResult j P.printUnused
 
 -- ## Print
@@ -144,12 +154,14 @@ encodeMessage t m
 
 getRootDirectory
   :: Maybe FilePath
+  -- ^ Path of the project root.
   -> FilePath
+  -- ^ Absolute path of the file to check.
   -> IO FilePath
 getRootDirectory Nothing p
   = getRootDirectoryFrom (takeDirectory p) (takeDirectory p)
 getRootDirectory (Just r) _
-  = pure r
+  = makeAbsolute r
 
 -- Search recursively upwards for project root directory.
 getRootDirectoryFrom

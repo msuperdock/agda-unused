@@ -22,7 +22,7 @@ import Options.Applicative
     info, long, metavar, optional, progDesc, short, strArgument, strOption,
     switch)
 import System.Directory
-  (listDirectory)
+  (listDirectory, makeAbsolute)
 import System.Exit
   (exitFailure, exitSuccess)
 import System.FilePath
@@ -87,7 +87,8 @@ check
   :: Options
   -> IO ()
 check o@(Options f r _ _)
-  = getRootDirectory r f
+  = makeAbsolute f
+  >>= getRootDirectory r
   >>= checkWith o
 
 checkWith
@@ -146,7 +147,7 @@ getRootDirectory
   -> FilePath
   -> IO FilePath
 getRootDirectory Nothing p
-  = getRootDirectoryFrom p p
+  = getRootDirectoryFrom (takeDirectory p) (takeDirectory p)
 getRootDirectory (Just r) _
   = pure r
 

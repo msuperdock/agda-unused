@@ -9,7 +9,7 @@ import Agda.Unused.Monad.Error
 import Agda.Unused.Monad.Reader
   (Mode(..))
 import Agda.Unused.Print
-  (printUnusedItems)
+  (printError, printUnusedItems)
 import Agda.Unused.Types.Access
   (Access(..))
 import Agda.Unused.Types.Name
@@ -177,9 +177,9 @@ testCheck t = do
   filePath
     <- testFilePath t
   unusedLocal
-    <- checkUnusedWith Local rootPath filePath
+    <- checkUnusedWith Local rootPath [rootPath] filePath
   unusedGlobal
-    <- checkUnusedWith Global rootPath filePath
+    <- checkUnusedWith Global rootPath [rootPath] filePath
   _
     <- testUnused unusedLocal (mapMaybe privateMay (testResult t))
   _
@@ -190,11 +190,11 @@ testCheckExample
   :: Expectation
 testCheckExample = do
   rootPath
-    <- getDataFileName "data/test/example"
+    <- getDataFileName "data/example"
   filePath
-    <- getDataFileName "data/test/example/Test.agda"
+    <- getDataFileName "data/example/Test.agda"
   unused
-    <- checkUnused rootPath filePath
+    <- checkUnused rootPath [rootPath] filePath
   _
     <- testUnusedExample unused
   pure ()
@@ -203,8 +203,8 @@ testUnused
   :: Either Error UnusedItems
   -> [RangeInfo]
   -> Expectation
-testUnused (Left _) _
-  = expectationFailure ""
+testUnused (Left e) _
+  = expectationFailure (T.unpack (printError e))
 testUnused (Right (UnusedItems is)) rs
   = Set.fromList (snd <$> is) `shouldBe` Set.fromList rs
 
@@ -371,13 +371,13 @@ testRootPath
   :: Test
   -> IO FilePath
 testRootPath t
-  = getDataFileName ("data/test" </> testDir t)
+  = getDataFileName ("data" </> testDir t)
 
 testFilePath
   :: Test
   -> IO FilePath
 testFilePath t
-  = getDataFileName ("data/test" </> testDir t </> testFileName t <.> "agda")
+  = getDataFileName ("data" </> testDir t </> testFileName t <.> "agda")
 
 testFileName
   :: Test

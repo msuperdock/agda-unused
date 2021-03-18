@@ -141,8 +141,6 @@ Additionally, we currently do not support the following Agda features:
 
 - [record module instance applications](https://agda.readthedocs.io/en/v2.6.1.3/language/module-system.html#parameterised-modules)
 - [unquoting declarations](https://agda.readthedocs.io/en/v2.6.1.3/language/reflection.html#id3)
-- [external libraries](https://agda.readthedocs.io/en/v2.6.1.3/tools/package-system.html)
-(other than Agda's built-in libraries)
 
 `agda-unused` will produce an error if your code uses these language features.
 

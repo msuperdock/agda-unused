@@ -15,11 +15,12 @@ import Agda.Unused.Monad.Error
   (Error(..), InternalError(..), UnexpectedError(..), UnsupportedError(..),
     liftLookup)
 import Agda.Unused.Monad.Reader
-  (Environment(..), Mode(..), askGlobalMain, askLocal, askRoot, askSkip,
-    localGlobal, localSkip)
+  (Environment(..), Mode(..), askGlobalMain, askIncludes, askLocal, askRoot,
+    askSkip, localGlobal, localSkip)
 import Agda.Unused.Monad.State
-  (ModuleState(..), State, getModule, modifyBlock, modifyCheck, modifyDelete,
-    modifyInsert, stateEmpty, stateItems, stateModules)
+  (ModuleState(..), State, getModule, getSources, modifyBlock, modifyCheck,
+    modifyDelete, modifyInsert, modifySources, stateEmpty, stateItems,
+    stateModules)
 import Agda.Unused.Types.Access
   (Access(..), fromAccess)
 import Agda.Unused.Types.Context
@@ -34,13 +35,19 @@ import Agda.Unused.Types.Context
 import qualified Agda.Unused.Types.Context
   as C
 import Agda.Unused.Types.Name
-  (Name(..), QName(..), isBuiltin, fromAsName, fromName, fromNameRange,
-    fromQName, fromQNameRange, nameIds, pathQName, qNamePath)
+  (Name(..), QName(..), fromAsName, fromName, fromNameRange, fromQName,
+    fromQNameRange, nameIds, pathQName, qNamePath, toQName)
 import Agda.Unused.Types.Range
   (Range'(..), RangeInfo(..), RangeType(..), rangePath)
 import Agda.Unused.Utils
   (liftMaybe, mapLeft)
 
+import Agda.Interaction.FindFile
+  (findFile'', srcFilePath)
+import Agda.Interaction.Options
+  (defaultOptions)
+import Agda.Interaction.Options.Lenses
+  (setIncludePaths)
 import Agda.Syntax.Common
   (Arg(..), Fixity'(..), GenPart(..), ImportDirective'(..), ImportedName'(..),
     IsInstance, Named(..), Ranged(..), Renaming'(..), RewriteEqn'(..),
@@ -59,15 +66,19 @@ import Agda.Syntax.Concrete.Definitions
 import Agda.Syntax.Concrete.Fixity
   (DoWarn(..), Fixities, fixitiesAndPolarities)
 import Agda.Syntax.Concrete.Name
-  (NameInScope(..), NamePart(..), nameRange)
+  (NameInScope(..), NamePart(..), nameRange, toTopLevelModuleName)
 import qualified Agda.Syntax.Concrete.Name
   as N
 import Agda.Syntax.Parser
   (moduleParser, parseFile, runPMIO)
 import Agda.Syntax.Position
   (Range, getRange)
+import Agda.TypeChecking.Monad.Base
+  (getIncludeDirs, runTCMTop)
+import Agda.TypeChecking.Monad.Options
+  (setCommandLineOptions)
 import Agda.Utils.FileName
-  (AbsolutePath(..))
+  (filePath, mkAbsolute)
 import Control.Monad
   (foldM, unless, void, when)
 import Control.Monad.Except
@@ -86,15 +97,10 @@ import qualified Data.Map.Strict
   as Map
 import Data.Maybe
   (catMaybes)
-import qualified Data.Text
-  as T
 import System.Directory
   (doesDirectoryExist, doesFileExist, listDirectory)
 import System.FilePath
   ((</>))
-
-import Paths_agda_unused
-  (getDataFileName)
 
 -- ## Context
 
@@ -472,7 +478,7 @@ checkPattern _ (QuoteP _)
 checkPattern c (RawAppP _ ps)
   = checkRawAppP c ps
 checkPattern _ (OpAppP r _ _ _)
-  = throwError (ErrorInternal (ErrorUnexpected UnexpectedOpAppP) r)
+  = throwError (ErrorInternal (ErrorUnexpected UnexpectedOpAppP r))
 checkPattern c (HiddenP _ (Named _ p))
   = checkPattern c p
 checkPattern c (InstanceP _ (Named _ p))
@@ -595,7 +601,7 @@ checkExpr c (RawApp _ es)
 checkExpr c (App _ e (Arg _ (Named _ e')))
   = checkExpr c e >> checkExpr c e'
 checkExpr _ (OpApp r _ _ _)
-  = throwError (ErrorInternal (ErrorUnexpected UnexpectedOpApp) r)
+  = throwError (ErrorInternal (ErrorUnexpected UnexpectedOpApp r))
 checkExpr c (WithApp _ e es)
   = checkExpr c e >> checkExprs c es
 checkExpr c (HiddenArg _ (Named _ e))
@@ -631,15 +637,15 @@ checkExpr c (IdiomBrackets _ es)
 checkExpr c (DoBlock _ ss)
   = void (checkDoStmts c ss)
 checkExpr _ (Absurd r)
-  = throwError (ErrorInternal (ErrorUnexpected UnexpectedAbsurd) r)
+  = throwError (ErrorInternal (ErrorUnexpected UnexpectedAbsurd r))
 checkExpr _ (As r _ _)
-  = throwError (ErrorInternal (ErrorUnexpected UnexpectedAs) r)
+  = throwError (ErrorInternal (ErrorUnexpected UnexpectedAs r))
 checkExpr c (Dot _ e)
   = checkExpr c e
 checkExpr c (DoubleDot _ e)
   = checkExpr c e
 checkExpr _ e@(ETel _)
-  = throwError (ErrorInternal (ErrorUnexpected UnexpectedETel) (getRange e))
+  = throwError (ErrorInternal (ErrorUnexpected UnexpectedETel (getRange e)))
 checkExpr _ (Quote _)
   = pure ()
 checkExpr _ (QuoteTerm _)
@@ -649,11 +655,11 @@ checkExpr c (Tactic _ e)
 checkExpr _ (Unquote _)
   = pure ()
 checkExpr _ e@(DontCare _)
-  = throwError (ErrorInternal (ErrorUnexpected UnexpectedDontCare) (getRange e))
+  = throwError (ErrorInternal (ErrorUnexpected UnexpectedDontCare (getRange e)))
 checkExpr _ (Equal r _ _)
-  = throwError (ErrorInternal (ErrorUnexpected UnexpectedEqual) r)
+  = throwError (ErrorInternal (ErrorUnexpected UnexpectedEqual r))
 checkExpr _ (Ellipsis r)
-  = throwError (ErrorInternal (ErrorUnexpected UnexpectedEllipsis) r)
+  = throwError (ErrorInternal (ErrorUnexpected UnexpectedEllipsis r))
 checkExpr c (Generalized e)
   = checkExpr c e
 
@@ -899,7 +905,7 @@ checkWhereClause c (AnyWhere ds)
   = checkDeclarations c ds
   >>= \c' -> pure (mempty, c')
 checkWhereClause c (SomeWhere n a ds)
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
+  = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromName n)
   >>= \n' -> checkDeclarations c ds
   >>= \c' -> checkModuleName (toContext c') (fromAccess a) (getRange n) n'
   >>= \c'' -> pure (c'' , c')
@@ -1121,13 +1127,13 @@ checkNiceDeclaration'
 checkNiceDeclaration' fs c (Axiom _ a _ _ _ n e)
   = checkExpr c e >> checkName' False fs (fromAccess a) RangePostulate n
 checkNiceDeclaration' _ _ (NiceField r _ _ _ _ _ _)
-  = throwError (ErrorInternal (ErrorUnexpected UnexpectedField) r)
+  = throwError (ErrorInternal (ErrorUnexpected UnexpectedField r))
 checkNiceDeclaration' fs c (PrimitiveFunction _ a _ n e)
   = checkExpr c e >> checkName' False fs (fromAccess a) RangeDefinition n
 checkNiceDeclaration' _ c (NiceModule r a _ (N.QName n) bs ds)
   = checkNiceModule c (fromAccess a) r (fromName n) bs ds
 checkNiceDeclaration' _ _ (NiceModule _ _ _ n@(N.Qual _ _) _ _)
-  = throwError (ErrorInternal ErrorName (getRange n))
+  = throwError (ErrorInternal (ErrorName (getRange n)))
 checkNiceDeclaration' _ _ (NicePragma _ _)
   = pure mempty
 checkNiceDeclaration' fs c (NiceRecSig _ a _ _ _ n bs e)
@@ -1135,7 +1141,7 @@ checkNiceDeclaration' fs c (NiceRecSig _ a _ _ _ n bs e)
 checkNiceDeclaration' fs c (NiceDataSig _ a _ _ _ n bs e)
   = checkNiceSig fs c a RangeData n bs e
 checkNiceDeclaration' _ _ (NiceFunClause r _ _ _ _ _ _)
-  = throwError (ErrorInternal (ErrorUnexpected UnexpectedNiceFunClause) r)
+  = throwError (ErrorInternal (ErrorUnexpected UnexpectedNiceFunClause r))
 checkNiceDeclaration' fs c (FunSig _ a _ _ _ _ _ _ n e)
   = checkExpr c e >> checkName' False fs (fromAccess a) RangeDefinition n
 checkNiceDeclaration' _ c (FunDef _ _ _ _ _ _ _ cs)
@@ -1177,7 +1183,7 @@ checkNiceDeclaration' fs c (NiceMutual r _ _ _ ds)
 checkNiceDeclaration' _ c
   (NiceModuleMacro r _ (N.NoName _ _)
     (SectionApp _ [] (RawApp _ (Ident n : es))) DoOpen i)
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
+  = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromQName n)
   >>= \n' -> liftLookup r n' (accessContextLookupModule n' c)
   >>= \(C.Module rs c') -> modifyDelete rs
   >> checkExprs c es
@@ -1186,8 +1192,8 @@ checkNiceDeclaration' _ c
 checkNiceDeclaration' _ c
   (NiceModuleMacro r a a'
     (SectionApp _ bs (RawApp _ (Ident n : es))) DontOpen i)
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
-  >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a')) (fromName a')
+  = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromQName n)
+  >>= \n' -> liftMaybe (ErrorInternal (ErrorName (getRange a'))) (fromName a')
   >>= \a'' -> liftLookup r n' (accessContextLookupModule n' c)
   >>= \(C.Module rs c') -> modifyDelete rs
   >> checkTypedBindings True c bs
@@ -1197,8 +1203,8 @@ checkNiceDeclaration' _ c
 checkNiceDeclaration' _ c
   (NiceModuleMacro r a a'
     (SectionApp _ bs (RawApp _ (Ident n : es))) DoOpen i)
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
-  >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a')) (fromName a')
+  = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromQName n)
+  >>= \n' -> liftMaybe (ErrorInternal (ErrorName (getRange a'))) (fromName a')
   >>= \a'' -> liftLookup r n' (accessContextLookupModule n' c)
   >>= \(C.Module rs c') -> modifyDelete rs
   >> checkTypedBindings True c bs
@@ -1209,40 +1215,40 @@ checkNiceDeclaration' _ c
 checkNiceDeclaration' _ _
   (NiceModuleMacro _ _ _
     (SectionApp r _ _) _ _)
-  = throwError (ErrorInternal ErrorMacro r)
+  = throwError (ErrorInternal (ErrorMacro r))
 checkNiceDeclaration' _ _
   (NiceModuleMacro r _ _
     (RecordModuleInstance _ _) _ _)
   = throwError (ErrorUnsupported UnsupportedMacro r)
 
 checkNiceDeclaration' _ c (NiceOpen r n i)
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
+  = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromQName n)
   >>= \n' -> liftLookup r n' (accessContextLookupModule n' c)
   >>= \(C.Module rs c') -> modifyDelete rs
   >> checkImportDirective Open r n' c' i
   >>= \c'' -> pure (fromContext (importDirectiveAccess i) c'')
 
 checkNiceDeclaration' _ _ (NiceImport r n Nothing DontOpen i)
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
-  >>= \n' -> checkFile (Just r) n'
+  = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromQName n)
+  >>= \n' -> checkFile r n'
   >>= \c' -> checkImportDirective Import r n' c' i
   >>= \c'' -> pure (accessContextImport n' c'')
 checkNiceDeclaration' _ _ (NiceImport r n Nothing DoOpen i)
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
-  >>= \n' -> checkFile (Just r) n'
+  = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromQName n)
+  >>= \n' -> checkFile r n'
   >>= \c' -> checkImportDirective Import r n' c' i
   >>= \c'' -> pure (accessContextImport n' c'
     <> fromContext (importDirectiveAccess i) c'')
 checkNiceDeclaration' _ _ (NiceImport r n (Just a) DontOpen i)
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
-  >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a)) (fromAsName a)
-  >>= \a' -> checkFile (Just r) n'
+  = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromQName n)
+  >>= \n' -> liftMaybe (ErrorInternal (ErrorName (getRange a))) (fromAsName a)
+  >>= \a' -> checkFile r n'
   >>= \c' -> checkImportDirective Import r n' c' i
   >>= \c'' -> checkModuleName c'' Public (getRange a) a'
 checkNiceDeclaration' _ _ (NiceImport r n (Just a) DoOpen i)
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromQName n)
-  >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange a)) (fromAsName a)
-  >>= \a' -> checkFile (Just r) n'
+  = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromQName n)
+  >>= \n' -> liftMaybe (ErrorInternal (ErrorName (getRange a))) (fromAsName a)
+  >>= \a' -> checkFile r n'
   >>= \c' -> checkImportDirective Import r n' c' i
   >>= \c'' -> checkModuleName c' Public (getRange a) a'
   >>= \c''' -> pure (c''' <> fromContext (importDirectiveAccess i) c'')
@@ -1387,7 +1393,7 @@ checkNiceDataDef
   -> [NiceConstructor]
   -> m AccessContext
 checkNiceDataDef b fs c n bs cs
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
+  = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromName n)
   >>= \n' -> pure (either (const []) id (accessContextLookup (QName n') c))
   >>= \rs -> checkLamBindings b c bs
   >>= \c' -> checkNiceConstructors fs rs (accessContextDefine n' c <> c') cs
@@ -1408,7 +1414,7 @@ checkNiceRecordDef
   -> [Declaration]
   -> m AccessContext
 checkNiceRecordDef b fs c n m bs ds
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
+  = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromName n)
   >>= \n' -> pure (either (const []) id (accessContextLookup (QName n') c))
   >>= \rs -> checkLamBindings b c bs
   >>= \c' -> checkNiceConstructorRecordMay fs rs (m >>= fromNameRange . fst)
@@ -1434,7 +1440,7 @@ checkNiceConstructor fs rs c (Axiom _ a _ _ _ n e)
       (itemConstructor rs (syntax fs n''))))
     (fromName n)
 checkNiceConstructor _ _ _ d
-  = throwError (ErrorInternal ErrorConstructor (getRange d))
+  = throwError (ErrorInternal (ErrorConstructor (getRange d)))
 
 checkNiceConstructors
   :: MonadError Error m
@@ -1593,20 +1599,22 @@ checkImportedNamePair
   -> (Range, ImportedName, ImportedName)
   -> m Context
 checkImportedNamePair dt c (_, ImportedName n, ImportedName t)
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
-  >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange t)) (fromNameRange t)
+  = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromName n)
+  >>= \n' -> liftMaybe (ErrorInternal (ErrorName (getRange t)))
+    (fromNameRange t)
   >>= \(r, t') -> modifyInsert r (RangeNamed (directiveItem dt) (QName t'))
   >> pure (maybe mempty (contextItem t') (contextLookupItem (QName n') c)
     <> maybe mempty (contextModule t') (contextLookupModule (QName n') c))
   >>= contextInsertRangeAll r
 checkImportedNamePair dt c (_, ImportedModule n, ImportedModule t)
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
-  >>= \n' -> liftMaybe (ErrorInternal ErrorName (getRange t)) (fromNameRange t)
+  = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromName n)
+  >>= \n' -> liftMaybe (ErrorInternal (ErrorName (getRange t)))
+    (fromNameRange t)
   >>= \(r, t') -> modifyInsert r (RangeNamed (directiveItem dt) (QName t'))
   >> pure (maybe mempty (contextModule t') (contextLookupModule (QName n') c))
   >>= contextInsertRangeAll r
 checkImportedNamePair _ _ (r, _, _)
-  = throwError (ErrorInternal ErrorRenaming r)
+  = throwError (ErrorInternal (ErrorRenaming r))
 
 checkImportedNames
   :: MonadError Error m
@@ -1625,10 +1633,10 @@ modifyHiding
   -> ImportedName
   -> m Context
 modifyHiding c (ImportedName n)
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
+  = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromName n)
   >>= pure . flip contextDelete c
 modifyHiding c (ImportedModule n)
-  = liftMaybe (ErrorInternal ErrorName (getRange n)) (fromName n)
+  = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromName n)
   >>= pure . flip contextDeleteModule c
 
 modifyHidings
@@ -1708,7 +1716,7 @@ checkFile
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => Maybe Range
+  => Range
   -> QName
   -> m Context
 checkFile r n
@@ -1720,42 +1728,74 @@ checkFileWith
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => Maybe Range
+  => Range
   -> QName
   -> Maybe ModuleState
   -> m Context
-
-checkFileWith r n Nothing | isBuiltin n
-  = liftIO (getDataFileName ("data" </> qNamePath n))
-  >>= \p -> localSkip (checkFilePath r (Just n) p)
 checkFileWith r n Nothing
   = askRoot
-  >>= \p -> checkFilePath r (Just n) (p </> qNamePath n)
+  >>= \p -> pure (p </> qNamePath n)
+  >>= \p' -> liftIO (doesFileExist p')
+  >>= \b -> checkFileWith' r n (bool Nothing (Just p') b)
 checkFileWith r n (Just Blocked)
   = throwError (ErrorCyclic r n)
 checkFileWith _ _ (Just (Checked c))
   = pure c
+
+checkFileWith'
+  :: MonadError Error m
+  => MonadReader Environment m
+  => MonadState State m
+  => MonadIO m
+  => Range
+  -> QName
+  -> Maybe FilePath
+  -> m Context
+checkFileWith' r n Nothing
+  = checkFileExternal r n
+checkFileWith' _ n (Just p)
+  = checkFilePath (Just n) p
+
+checkFileExternal
+  :: MonadError Error m
+  => MonadReader Environment m
+  => MonadState State m
+  => MonadIO m
+  => Range
+  -> QName
+  -> m Context
+checkFileExternal r n = do
+  includes
+    <- askIncludes
+  sources
+    <- getSources
+  (pathEither, sources') 
+    <- liftIO (findFile'' includes (toTopLevelModuleName (toQName n)) sources)
+  path
+    <- liftEither (mapLeft (ErrorFind r n) pathEither)
+  _
+    <- modifySources sources'
+  localSkip (checkFilePath (Just n) (filePath (srcFilePath path)))
 
 checkFilePath
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => Maybe Range
-  -> Maybe QName
+  => Maybe QName
   -> FilePath
   -> m Context
-checkFilePath r n p = do
+checkFilePath n p = do
+  exists
+    <- liftIO (doesFileExist p)
+  _
+    <- unless exists (throwError (ErrorFile p))
   local
     <- askLocal
   _
     <- traverse_ modifyBlock n
   absolutePath
-    <- pure (AbsolutePath (T.pack p))
-  exists
-    <- liftIO (doesFileExist p)
-  _
-    <- unless exists (throwError (ErrorFile r n p))
+    <- pure (mkAbsolute p)
   contents
     <- liftIO (readFile p)
   (parseResult, _)
@@ -1812,6 +1852,8 @@ checkPathDirectory ms p p'
 checkUnused
   :: FilePath
   -- ^ Absolute path of the project root directory.
+  -> [FilePath]
+  -- ^ Absolute include paths.
   -> FilePath
   -- ^ Absolute path of the file to check.
   -> IO (Either Error UnusedItems)
@@ -1825,15 +1867,17 @@ checkUnusedWith
   -- ^ The check mode to use.
   -> FilePath
   -- ^ Absolute path of the project root directory.
+  -> [FilePath]
+  -- ^ Absolute include paths.
   -> FilePath
   -- ^ Absolute path of the file to check.
   -> IO (Either Error UnusedItems)
-checkUnusedWith m p
+checkUnusedWith m p ps
   = runExceptT
   . fmap UnusedItems
   . fmap stateItems
-  . runUnusedT m p
-  . checkFilePath Nothing Nothing
+  . runUnusedT m p ps
+  . checkFilePath Nothing
 
 -- | Check an Agda file and its dependencies for unused code, including public
 -- items in dependencies, as well as files.
@@ -1843,20 +1887,23 @@ checkUnusedWith m p
 checkUnusedGlobal
   :: FilePath
   -- ^ Absolute path of the project root directory.
+  -> [FilePath]
+  -- ^ Absolute include paths.
   -> FilePath
   -- ^ Absolute path of the file to check.
   -> IO (Either Error Unused)
-checkUnusedGlobal p p'
-  = runExceptT (checkUnusedGlobal' p p')
+checkUnusedGlobal p ps p'
+  = runExceptT (checkUnusedGlobal' p ps p')
 
 checkUnusedGlobal'
   :: MonadIO m
   => FilePath
+  -> [FilePath]
   -> FilePath
   -> ExceptT Error m Unused
-checkUnusedGlobal' p p' = do
+checkUnusedGlobal' p ps p' = do
   state
-    <- runUnusedT GlobalMain p (checkFilePath Nothing Nothing p')
+    <- runUnusedT GlobalMain p ps (checkFilePath Nothing p')
   files
     <- checkPath (stateModules state) p p
   items 
@@ -1866,15 +1913,23 @@ checkUnusedGlobal' p p' = do
   pure unused
 
 runUnusedT
-  :: Functor m
+  :: MonadError Error m
+  => MonadIO m
   => Mode
   -> FilePath
+  -> [FilePath]
   -> ReaderT Environment (StateT State m) a
   -> m State
-runUnusedT m p
-  = fmap snd
-  . flip runStateT stateEmpty
-  . flip runReaderT (Environment m p)
+runUnusedT m p ps x = do
+  options
+    <- pure (setIncludePaths ps defaultOptions)
+  pathsEither
+    <- liftIO (runTCMTop (setCommandLineOptions options >> getIncludeDirs))
+  paths
+    <- liftEither (mapLeft (const (ErrorInternal ErrorInclude)) pathsEither)
+  (_, state)
+    <- runStateT (runReaderT x (Environment m p paths)) stateEmpty
+  pure state
 
 inFile
   :: FilePath

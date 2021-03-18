@@ -19,8 +19,8 @@ import Data.Text.Lazy
   (toStrict)
 import Options.Applicative
   (InfoMod, Parser, ParserInfo, execParser, fullDesc, header, help, helper,
-    info, long, metavar, optional, progDesc, short, strArgument, strOption,
-    switch)
+    info, long, many, metavar, optional, progDesc, short, strArgument,
+    strOption, switch)
 import System.Directory
   (listDirectory, makeAbsolute)
 import System.Exit
@@ -40,6 +40,9 @@ data Options
   , optionsRoot
     :: !(Maybe FilePath)
     -- ^ Path of the project root directory.
+  , optionsIncludes
+    :: ![FilePath]
+    -- ^ Include paths.
   , optionsGlobal
     :: !Bool
     -- ^ Whether to check project globally.
@@ -60,6 +63,11 @@ optionsParser
     <> long "root"
     <> metavar "ROOT"
     <> help "Path of project root directory")
+  <*> many (strOption
+    $ short 'i'
+    <> long "include-path"
+    <> metavar "DIR"
+    <> help "Look for imports in DIR")
   <*> (switch
     $ short 'g'
     <> long "global"
@@ -86,18 +94,22 @@ options
 check
   :: Options
   -> IO ()
-check (Options f r g j) = do
+check (Options f r ps g j) = do
   filePath
     <- makeAbsolute f
   rootPath
     <- getRootDirectory r filePath
+  includePaths
+    <- traverse makeAbsolute ps
   _
-    <- checkWith rootPath filePath g j
+    <- checkWith rootPath includePaths filePath g j
   pure ()
 
 checkWith
   :: FilePath
   -- ^ Absolute path of the project root.
+  -> [FilePath]
+  -- ^ Absolute include paths.
   -> FilePath
   -- ^ Absolute path of the file to check.
   -> Bool
@@ -105,11 +117,11 @@ checkWith
   -> Bool
   -- ^ Whether to format output as JSON.
   -> IO ()
-checkWith p p' False j
-  = checkUnused p p'
+checkWith p ps p' False j
+  = checkUnused p ps p'
   >>= printResult j P.printUnusedItems
-checkWith p p' True j
-  = checkUnusedGlobal p p'
+checkWith p ps p' True j
+  = checkUnusedGlobal p ps p'
   >>= printResult j P.printUnused
 
 -- ## Print

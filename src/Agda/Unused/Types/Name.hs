@@ -14,7 +14,6 @@ module Agda.Unused.Types.Name
     -- * Interface
 
   , nameIds
-  , isBuiltin
   , stripPrefix
 
     -- * Conversion
@@ -24,6 +23,9 @@ module Agda.Unused.Types.Name
   , fromQName
   , fromQNameRange
   , fromAsName
+
+  , toName
+  , toQName
 
     -- * Paths
 
@@ -42,11 +44,11 @@ import Agda.Unused.Utils
 import Agda.Syntax.Concrete
   (AsName, AsName'(..))
 import Agda.Syntax.Concrete.Name
-  (NamePart(..))
+  (NameInScope(..), NamePart(..))
 import qualified Agda.Syntax.Concrete.Name
   as N
 import Agda.Syntax.Position
-  (Range)
+  (Range, Range'(..))
 import Data.List
   (isSubsequenceOf)
 import qualified Data.List
@@ -105,15 +107,6 @@ isOperator (Name (_ : []))
   = False
 isOperator (Name (_ : _ : _))
   = True
-
--- | Determine if a module name represents a builtin module.
-isBuiltin
-  :: QName
-  -> Bool
-isBuiltin (Qual (Name [Id "Agda"]) _)
-  = True
-isBuiltin _
-  = False
 
 -- | If the first module name is a prefix of the second module name, then strip
 -- the prefix, otherwise return 'Nothing'.
@@ -175,6 +168,22 @@ fromAsName (AsName (Left _) _)
   = Nothing
 fromAsName (AsName (Right n) _)
   = fromName n
+
+-- | Conversion to Agda name type.
+toName
+  :: Name
+  -> N.Name
+toName (Name n)
+  = N.Name NoRange NotInScope n
+
+-- | Conversion to Agda qualified name type.
+toQName
+  :: QName
+  -> N.QName
+toQName (QName n)
+  = N.QName (toName n)
+toQName (Qual n ns)
+  = N.Qual (toName n) (toQName ns)
 
 -- ## Paths
 

@@ -27,6 +27,8 @@ import Agda.Unused.Types.Name
 import Agda.Unused.Types.Range
   (Range, getRange)
 
+import Agda.Interaction.FindFile
+  (FindError)
 import Agda.Syntax.Concrete.Definitions
   (DeclarationException)
 import Agda.Syntax.Concrete.Fixity
@@ -49,7 +51,7 @@ data Error where
 
   -- | Cyclic module dependency.
   ErrorCyclic
-    :: !(Maybe Range)
+    :: !Range
     -> !QName
     -> Error
 
@@ -60,9 +62,14 @@ data Error where
 
   -- | File not found.
   ErrorFile
-    :: !(Maybe Range)
-    -> !(Maybe QName)
-    -> !FilePath
+    :: !FilePath
+    -> Error
+
+  -- | Agda find error.
+  ErrorFind
+    :: !Range
+    -> !QName
+    -> !FindError
     -> Error
 
   -- | Agda fixity exception.
@@ -78,7 +85,6 @@ data Error where
   -- | Internal error; should be reported.
   ErrorInternal
     :: !InternalError
-    -> !Range
     -> Error
 
   -- | Module not found in open statement.
@@ -109,31 +115,38 @@ data Error where
     -> !Range
     -> Error
 
-  deriving Show
-
 -- | An internal error, indicating a bug in our code. This type of error should
 -- be reported by filing an issue.
 data InternalError where
 
   -- | Unexpected declaration type for constructor.
   ErrorConstructor
+    :: !Range
+    -> InternalError
+
+  -- | Unexpected error in computing include paths.
+  ErrorInclude
     :: InternalError
 
   -- | Unexpected arguments to SectionApp constructor.
   ErrorMacro
-    :: InternalError
+    :: !Range
+    -> InternalError
 
   -- | Unexpected underscore as name.
   ErrorName
-    :: InternalError
+    :: !Range
+    -> InternalError
 
   -- | Unexpected name-module mismatch in renaming statement.
   ErrorRenaming
-    :: InternalError
+    :: !Range
+    -> InternalError
 
   -- | Unexpected data type constructor.
   ErrorUnexpected
     :: !UnexpectedError
+    -> !Range
     -> InternalError
 
   deriving Show

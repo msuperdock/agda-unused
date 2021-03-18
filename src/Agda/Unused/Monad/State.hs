@@ -19,6 +19,7 @@ module Agda.Unused.Monad.State
     -- * Get
 
   , getModule
+  , getSources
 
     -- * Modify
 
@@ -26,6 +27,7 @@ module Agda.Unused.Monad.State
   , modifyDelete
   , modifyBlock
   , modifyCheck
+  , modifySources
 
   ) where
 
@@ -40,6 +42,8 @@ import Agda.Unused.Types.Range
 import Agda.Unused.Utils
   (mapDeletes)
 
+import Agda.TypeChecking.Monad.Base
+  (ModuleToSource)
 import Control.Monad
   (unless)
 import Control.Monad.Reader
@@ -77,6 +81,9 @@ data State
   , stateModules'
     :: !(Map QName ModuleState)
     -- ^ States for each module dependency.
+  , stateSources'
+    :: !ModuleToSource
+    -- ^ A cache of source paths corresponding to certain module names.
   } deriving Show
 
 -- ## Interface
@@ -85,7 +92,7 @@ data State
 stateEmpty
   :: State
 stateEmpty
-  = State mempty mempty
+  = State mempty mempty mempty
 
 -- | Get a sorted list of state items.
 --
@@ -98,14 +105,6 @@ stateItems
   = stateItemsFilter
   . Map.toAscList
   . stateItems'
-
--- | Get a list of visited modules.
-stateModules
-  :: State
-  -> [QName]
-stateModules
-  = Map.keys
-  . stateModules'
 
 -- Remove nested items.
 stateItemsFilter
@@ -120,6 +119,21 @@ stateItemsFilter (i : i' : is) | rangeContains (fst i') (fst i)
 stateItemsFilter (i : is)
   = i : stateItemsFilter is
 
+-- | Get a list of visited modules.
+stateModules
+  :: State
+  -> [QName]
+stateModules
+  = Map.keys
+  . stateModules'
+
+stateSources
+  :: ModuleToSource
+  -> State
+  -> State
+stateSources ss (State rs ms _)
+  = State rs ms ss
+
 stateInsert
   :: Range
   -> RangeInfo
@@ -127,37 +141,37 @@ stateInsert
   -> State
 stateInsert NoRange _ s
   = s
-stateInsert r@(Range _ _) i (State rs ms)
-  = State (Map.insert r i rs) ms
+stateInsert r@(Range _ _) i (State rs ms ss)
+  = State (Map.insert r i rs) ms ss
 
 stateDelete
   :: [Range]
   -> State
   -> State
-stateDelete rs (State rs' ms)
-  = State (mapDeletes rs rs') ms
+stateDelete rs (State rs' ms ss)
+  = State (mapDeletes rs rs') ms ss
 
 stateModule
   :: QName
   -> State
   -> Maybe ModuleState
-stateModule n (State _ ms)
+stateModule n (State _ ms _)
   = Map.lookup n ms
 
 stateBlock
   :: QName
   -> State
   -> State
-stateBlock n (State rs ms)
-  = State rs (Map.insert n Blocked ms)
+stateBlock n (State rs ms ss)
+  = State rs (Map.insert n Blocked ms) ss
 
 stateCheck
   :: QName
   -> Context
   -> State
   -> State
-stateCheck n c (State rs ms)
-  = State rs (Map.insert n (Checked c) ms)
+stateCheck n c (State rs ms ss)
+  = State rs (Map.insert n (Checked c) ms) ss
 
 -- ## Get
 
@@ -168,6 +182,13 @@ getModule
   -> m (Maybe ModuleState)
 getModule n
   = gets (stateModule n)
+
+-- | Get the cache of source paths.
+getSources
+  :: MonadState State m
+  => m ModuleToSource
+getSources
+  = gets stateSources'
 
 -- ## Modify
 
@@ -206,4 +227,12 @@ modifyCheck
   -> m ()
 modifyCheck n c
   = modify (stateCheck n c)
+
+-- | Update the cache of sources.
+modifySources
+  :: MonadState State m
+  => ModuleToSource
+  -> m ()
+modifySources ss
+  = modify (stateSources ss)
 

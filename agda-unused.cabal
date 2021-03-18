@@ -3,7 +3,7 @@ cabal-version: 3.0
 name:
   agda-unused
 version:
-  1.0.0
+  0.2.0
 build-type:
   Simple
 license:
@@ -45,10 +45,6 @@ library
     Agda.Unused.Types.Name
     Agda.Unused.Types.Range
     Agda.Unused.Utils
-  other-modules:
-    Paths_agda_unused
-  autogen-modules:
-    Paths_agda_unused
   build-depends:
     base >= 4.13 && < 4.15,
     Agda >= 2.6.1 && < 2.6.2,

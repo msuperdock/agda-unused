@@ -16,6 +16,7 @@ module Agda.Unused.Monad.Reader
   , askLocal
   , askGlobalMain
   , askRoot
+  , askIncludes
 
     -- * Local
 
@@ -24,6 +25,8 @@ module Agda.Unused.Monad.Reader
 
   ) where
 
+import Agda.Utils.FileName
+  (AbsolutePath)
 import Control.Monad.Reader
   (MonadReader, ask, local)
 
@@ -59,6 +62,9 @@ data Environment
   , environmentRoot
     :: !FilePath
     -- ^ The project root path.
+  , environmentIncludes
+    :: ![AbsolutePath]
+    -- ^ The include paths.
   } deriving Show
 
 -- ## Ask
@@ -96,6 +102,13 @@ askRoot
   => m FilePath
 askRoot
   = environmentRoot <$> ask
+
+-- | Ask for the include paths.
+askIncludes
+  :: MonadReader Environment m
+  => m [AbsolutePath]
+askIncludes
+  = environmentIncludes <$> ask
 
 -- ## Local
 

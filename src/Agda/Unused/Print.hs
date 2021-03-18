@@ -19,6 +19,8 @@ import Agda.Unused.Types.Name
 import Agda.Unused.Types.Range
   (Range, Range'(..), RangeInfo(..), RangeType(..), getRange)
 
+import Agda.Interaction.FindFile
+  (FindError(..))
 import Agda.Utils.Pretty
   (prettyShow)
 import Data.Text
@@ -105,47 +107,45 @@ printError (ErrorAmbiguous r n)
   = printMessage (printRange r)
   $ "Error: Ambiguous name " <> parens (quote (printQName n)) <> "."
 printError (ErrorCyclic r n)
-  = printMessage (maybe (printQName n) printRange r)
-  $ "Error: Cyclic module dependency " <> parens (printQName n) <> "."
-printError (ErrorFile (Just r) _ p)
   = printMessage (printRange r)
-  $ printErrorFile p
-printError (ErrorFile _ (Just n) p)
-  = printMessage (printQName n)
-  $ printErrorFile p
+  $ "Error: Cyclic module dependency " <> parens (printQName n) <> "."
+printError (ErrorFind r n (NotFound _))
+  = printMessage (printRange r)
+  $ "Error: Import not found " <> parens (printQName n) <> "."
+printError (ErrorFind r n (Ambiguous _))
+  = printMessage (printRange r)
+  $ "Error: Ambiguous import " <> parens (printQName n) <> "."
 printError (ErrorFixity (Just r))
   = printMessage (printRange r)
   $ "Error: Multiple fixity declarations."
 printError (ErrorGlobal r)
   = printMessage (printRange r)
   $ "Error: With --global, all declarations in the given file must be imports."
-printError (ErrorInternal e r)
-  = printMessage (printRange r)
-  $ "Internal error: " <> printInternalError e
 printError (ErrorOpen r n)
   = printMessage (printRange r)
   $ "Error: Module not found " <> parens (printQName n) <> "."
 printError (ErrorPolarity (Just r))
   = printMessage (printRange r)
   $ "Error: Multiple polarity declarations."
-printError (ErrorRoot m n)
-  = printMessage (printQName m)
-  $ "Error: Root not found " <> parens (quote (printQName n)) <> "."
+printError (ErrorRoot n n')
+  = printMessage (printQName n)
+  $ "Error: Root not found " <> parens (quote (printQName n')) <> "."
 printError (ErrorUnsupported e r)
   = printMessage (printRange r)
   $ "Error: " <> printUnsupportedError e <> " not supported."
 
-printError (ErrorFile Nothing Nothing p)
+printError (ErrorDeclaration e)
+  = printRange (getRange e) <> "\n" <> T.pack (prettyShow e)
+printError (ErrorFile p)
   = printErrorFile p
 printError (ErrorFixity Nothing)
   = "Error: Multiple fixity declarations."
+printError (ErrorInternal e)
+  = printInternalError e
+printError (ErrorParse e)
+  = T.pack (prettyShow e)
 printError (ErrorPolarity Nothing)
   = "Error: Multiple polarity declarations."
-
-printError (ErrorDeclaration e)
-  = printRange (getRange e) <> "\n" <> T.pack (prettyShow e)
-printError (ErrorParse e)
-  = T.pack (show e)
 
 printErrorFile
   :: FilePath
@@ -156,16 +156,25 @@ printErrorFile p
 printInternalError
   :: InternalError
   -> Text
-printInternalError ErrorConstructor
-  = "Invalid data constructor."
-printInternalError ErrorMacro
-  = "Invalid module application."
-printInternalError ErrorName
-  = "Invalid name."
-printInternalError ErrorRenaming
-  = "Invalid renaming directive."
-printInternalError (ErrorUnexpected e)
-  = "Unexpected constructor " <> quote (printUnexpectedError e) <> "."
+printInternalError (ErrorConstructor r)
+  = printMessage (printRange r)
+  $ "Internal error: Invalid data constructor."
+printInternalError (ErrorMacro r)
+  = printMessage (printRange r)
+  $ "Internal error: Invalid module application."
+printInternalError (ErrorName r)
+  = printMessage (printRange r)
+  $ "Internal error: Invalid name."
+printInternalError (ErrorRenaming r)
+  = printMessage (printRange r)
+  $ "Internal error: Invalid renaming directive."
+printInternalError (ErrorUnexpected e r)
+  = printMessage (printRange r)
+  $ "Internal error: Unexpected constructor "
+    <> quote (printUnexpectedError e) <> "."
+
+printInternalError ErrorInclude
+  = "Internal error: Unable to compute include paths."
 
 printUnexpectedError
   :: UnexpectedError

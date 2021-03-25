@@ -72,6 +72,7 @@ executable agda-unused
   build-depends:
     agda-unused,
     base >= 4.13 && < 4.15,
+    Agda >= 2.6.1 && < 2.6.2,
     aeson >= 1.4.7 && < 1.6,
     directory >= 1.3.6 && < 1.4,
     filepath >= 1.4.2 && < 1.5,
@@ -98,6 +99,7 @@ test-suite test
   build-depends:
     agda-unused,
     base >= 4.13 && < 4.15,
+    Agda >= 2.6.1 && < 2.6.2,
     containers >= 0.6.2 && < 0.7,
     filepath >= 1.4.2 && < 1.5,
     hspec >= 2.7.1 && < 2.8,

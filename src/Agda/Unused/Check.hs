@@ -45,9 +45,7 @@ import Agda.Unused.Utils
 import Agda.Interaction.FindFile
   (findFile'', srcFilePath)
 import Agda.Interaction.Options
-  (defaultOptions)
-import Agda.Interaction.Options.Lenses
-  (setIncludePaths)
+  (CommandLineOptions)
 import Agda.Syntax.Common
   (Arg(..), Fixity'(..), GenPart(..), ImportDirective'(..), ImportedName'(..),
     IsInstance, Named(..), Ranged(..), Renaming'(..), RewriteEqn'(..),
@@ -1850,10 +1848,10 @@ checkPathDirectory ms p p'
 -- | Check an Agda file and its dependencies for unused code, excluding public
 -- items that could be imported elsewhere.
 checkUnused
-  :: FilePath
+  :: CommandLineOptions
+  -- ^ Agda command line options.
+  -> FilePath
   -- ^ Absolute path of the project root directory.
-  -> [FilePath]
-  -- ^ Absolute include paths.
   -> FilePath
   -- ^ Absolute path of the file to check.
   -> IO (Either Error UnusedItems)
@@ -1865,18 +1863,17 @@ checkUnused
 checkUnusedWith
   :: Mode
   -- ^ The check mode to use.
+  -> CommandLineOptions
+  -- ^ Agda command line options.
   -> FilePath
   -- ^ Absolute path of the project root directory.
-  -> [FilePath]
-  -- ^ Absolute include paths.
   -> FilePath
   -- ^ Absolute path of the file to check.
   -> IO (Either Error UnusedItems)
-checkUnusedWith m p ps
+checkUnusedWith m opts p
   = runExceptT
-  . fmap UnusedItems
-  . fmap stateItems
-  . runUnusedT m p ps
+  . fmap (UnusedItems . stateItems)
+  . runUnusedT m opts p
   . checkFilePath Nothing
 
 -- | Check an Agda file and its dependencies for unused code, including public
@@ -1885,25 +1882,25 @@ checkUnusedWith m p ps
 -- The given file should consist only of import statements; it serves as a
 -- full description of the public interface of the project.
 checkUnusedGlobal
-  :: FilePath
+  :: CommandLineOptions
+  -- ^ Agda command line options.
+  -> FilePath
   -- ^ Absolute path of the project root directory.
-  -> [FilePath]
-  -- ^ Absolute include paths.
   -> FilePath
   -- ^ Absolute path of the file to check.
   -> IO (Either Error Unused)
-checkUnusedGlobal p ps p'
-  = runExceptT (checkUnusedGlobal' p ps p')
+checkUnusedGlobal opts p p'
+  = runExceptT (checkUnusedGlobal' opts p p')
 
 checkUnusedGlobal'
   :: MonadIO m
-  => FilePath
-  -> [FilePath]
+  => CommandLineOptions
+  -> FilePath
   -> FilePath
   -> ExceptT Error m Unused
-checkUnusedGlobal' p ps p' = do
+checkUnusedGlobal' opts p p' = do
   state
-    <- runUnusedT GlobalMain p ps (checkFilePath Nothing p')
+    <- runUnusedT GlobalMain opts p (checkFilePath Nothing p')
   files
     <- checkPath (stateModules state) p p
   items 
@@ -1916,15 +1913,13 @@ runUnusedT
   :: MonadError Error m
   => MonadIO m
   => Mode
+  -> CommandLineOptions
   -> FilePath
-  -> [FilePath]
   -> ReaderT Environment (StateT State m) a
   -> m State
-runUnusedT m p ps x = do
-  options
-    <- pure (setIncludePaths ps defaultOptions)
+runUnusedT m opts p x = do
   pathsEither
-    <- liftIO (runTCMTop (setCommandLineOptions options >> getIncludeDirs))
+    <- liftIO (runTCMTop (setCommandLineOptions opts >> getIncludeDirs))
   paths
     <- liftEither (mapLeft (const (ErrorInternal ErrorInclude)) pathsEither)
   (_, state)

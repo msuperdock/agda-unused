@@ -75,7 +75,7 @@ The project root directory is determined as follows:
 
 - If the `--root` option is given, its value is the project root.
 - Otherwise, the nearest ancestor directory of `FILE` containing an `.agda-lib`
- file is the project root, if any.
+  file is the project root, if any.
 - Otherwise, the parent directory of `FILE` is the project root.
 
 ## Global
@@ -132,10 +132,15 @@ identifiers are unused on the first run.
 
 ## Limitations
 
-We do not distinguish between overloaded constructors; if a constructor is used,
-we mark all constructors in scope with the same name as used. This is because
-`agda-unused` works with Agda's concrete syntax; to give more accurate results,
-we would need to use Agda's type-checker, which comes with a performance cost.
+We work with Agda's concrete syntax. This is a necessary choice, since Agda's
+abstract syntax doesn't distinguish between qualified and (opened) unqualified
+names, which makes it impossible to determine whether certain `open` statements
+are unused. However, this choice comes with several drawbacks:
+
+- We do not parse mixfix operators; if the parts of a mixfix operator are used
+  in order in an expression, then we mark the mixfix operator as used.
+- We do not distinguish between overloaded constructors; if a constructor is
+  used, then we mark all constructors in scope with the same name as used.
 
 Additionally, we currently do not support the following Agda features:
 

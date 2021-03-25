@@ -21,6 +21,8 @@ import Agda.Unused.Monad.State
   (ModuleState(..), State, getModule, getSources, modifyBlock, modifyCheck,
     modifyDelete, modifyInsert, modifySources, stateEmpty, stateItems,
     stateModules)
+import Agda.Unused.Options
+  (Options(..), setOptions)
 import Agda.Unused.Types.Access
   (Access(..), fromAccess)
 import Agda.Unused.Types.Context
@@ -44,8 +46,6 @@ import Agda.Unused.Utils
 
 import Agda.Interaction.FindFile
   (findFile'', srcFilePath)
-import Agda.Interaction.Options
-  (CommandLineOptions)
 import Agda.Syntax.Common
   (Arg(..), Fixity'(..), GenPart(..), ImportDirective'(..), ImportedName'(..),
     IsInstance, Named(..), Ranged(..), Renaming'(..), RewriteEqn'(..),
@@ -73,8 +73,6 @@ import Agda.Syntax.Position
   (Range, getRange)
 import Agda.TypeChecking.Monad.Base
   (getIncludeDirs, runTCMTop)
-import Agda.TypeChecking.Monad.Options
-  (setCommandLineOptions)
 import Agda.Utils.FileName
   (filePath, mkAbsolute)
 import Control.Monad
@@ -1848,10 +1846,8 @@ checkPathDirectory ms p p'
 -- | Check an Agda file and its dependencies for unused code, excluding public
 -- items that could be imported elsewhere.
 checkUnused
-  :: CommandLineOptions
-  -- ^ Agda command line options.
-  -> FilePath
-  -- ^ Absolute path of the project root directory.
+  :: Options
+  -- ^ Options to use.
   -> FilePath
   -- ^ Absolute path of the file to check.
   -> IO (Either Error UnusedItems)
@@ -1863,17 +1859,15 @@ checkUnused
 checkUnusedWith
   :: Mode
   -- ^ The check mode to use.
-  -> CommandLineOptions
-  -- ^ Agda command line options.
-  -> FilePath
-  -- ^ Absolute path of the project root directory.
+  -> Options
+  -- ^ Options to use.
   -> FilePath
   -- ^ Absolute path of the file to check.
   -> IO (Either Error UnusedItems)
-checkUnusedWith m opts p
+checkUnusedWith m opts
   = runExceptT
   . fmap (UnusedItems . stateItems)
-  . runUnusedT m opts p
+  . runUnusedT m opts
   . checkFilePath Nothing
 
 -- | Check an Agda file and its dependencies for unused code, including public
@@ -1882,29 +1876,26 @@ checkUnusedWith m opts p
 -- The given file should consist only of import statements; it serves as a
 -- full description of the public interface of the project.
 checkUnusedGlobal
-  :: CommandLineOptions
-  -- ^ Agda command line options.
-  -> FilePath
-  -- ^ Absolute path of the project root directory.
+  :: Options
+  -- ^ Options to use.
   -> FilePath
   -- ^ Absolute path of the file to check.
   -> IO (Either Error Unused)
-checkUnusedGlobal opts p p'
-  = runExceptT (checkUnusedGlobal' opts p p')
+checkUnusedGlobal opts p
+  = runExceptT (checkUnusedGlobal' opts p)
 
 checkUnusedGlobal'
   :: MonadIO m
-  => CommandLineOptions
-  -> FilePath
+  => Options
   -> FilePath
   -> ExceptT Error m Unused
-checkUnusedGlobal' opts p p' = do
+checkUnusedGlobal' opts p = do
   state
-    <- runUnusedT GlobalMain opts p (checkFilePath Nothing p')
+    <- runUnusedT GlobalMain opts (checkFilePath Nothing p)
   files
-    <- checkPath (stateModules state) p p
+    <- checkPath (stateModules state) (optionsRoot opts) (optionsRoot opts)
   items 
-    <- pure (UnusedItems (filter (not . inFile p') (stateItems state)))
+    <- pure (UnusedItems (filter (not . inFile p) (stateItems state)))
   unused
     <- pure (Unused files items)
   pure unused
@@ -1913,17 +1904,18 @@ runUnusedT
   :: MonadError Error m
   => MonadIO m
   => Mode
-  -> CommandLineOptions
-  -> FilePath
+  -> Options
   -> ReaderT Environment (StateT State m) a
   -> m State
-runUnusedT m opts p x = do
-  pathsEither
-    <- liftIO (runTCMTop (setCommandLineOptions opts >> getIncludeDirs))
-  paths
-    <- liftEither (mapLeft (const (ErrorInternal ErrorInclude)) pathsEither)
+runUnusedT m opts x = do
+  rootPath
+    <- pure (optionsRoot opts)
+  includesEither
+    <- liftIO (runTCMTop (setOptions opts >> getIncludeDirs))
+  includes
+    <- liftEither (mapLeft (const (ErrorInternal ErrorInclude)) includesEither)
   (_, state)
-    <- runStateT (runReaderT x (Environment m p paths)) stateEmpty
+    <- runStateT (runReaderT x (Environment m rootPath includes)) stateEmpty
   pure state
 
 inFile

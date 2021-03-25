@@ -4,13 +4,11 @@ import Agda.Unused.Check
   (checkUnused, checkUnusedGlobal)
 import qualified Agda.Unused.Monad.Error
   as E
+import qualified Agda.Unused.Options
+  as O
 import qualified Agda.Unused.Print
   as P
 
-import Agda.Interaction.Options
-  (CommandLineOptions, defaultOptions)
-import Agda.Interaction.Options.Lenses
-  (setIncludePaths)
 import Data.Aeson
   (Value(..), (.=), object)
 import Data.Aeson.Text
@@ -105,17 +103,13 @@ check (Options f r ps g j) = do
     <- getRootDirectory r filePath
   includePaths
     <- traverse makeAbsolute ps
-  options'
-    <- pure (setIncludePaths includePaths defaultOptions)
   _
-    <- checkWith options' rootPath filePath g j
+    <- checkWith (O.Options rootPath includePaths) filePath g j
   pure ()
 
 checkWith
-  :: CommandLineOptions
-  -- ^ Agda command line options.
-  -> FilePath
-  -- ^ Absolute path of the project root.
+  :: O.Options
+  -- ^ Options to use.
   -> FilePath
   -- ^ Absolute path of the file to check.
   -> Bool
@@ -123,11 +117,11 @@ checkWith
   -> Bool
   -- ^ Whether to format output as JSON.
   -> IO ()
-checkWith opts p p' False j
-  = checkUnused opts p p'
+checkWith opts p False j
+  = checkUnused opts p
   >>= printResult j P.printUnusedItems
-checkWith opts p p' True j
-  = checkUnusedGlobal opts p p'
+checkWith opts p True j
+  = checkUnusedGlobal opts p
   >>= printResult j P.printUnused
 
 -- ## Print

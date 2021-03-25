@@ -8,6 +8,8 @@ import Agda.Unused.Monad.Error
   (Error)
 import Agda.Unused.Monad.Reader
   (Mode(..))
+import Agda.Unused.Options
+  (Options(..))
 import Agda.Unused.Print
   (printError, printUnusedItems)
 import Agda.Unused.Types.Access
@@ -19,10 +21,6 @@ import Agda.Unused.Types.Range
 import qualified Agda.Unused.Types.Range
   as R
 
-import Agda.Interaction.Options
-  (CommandLineOptions, defaultOptions)
-import Agda.Interaction.Options.Lenses
-  (setIncludePaths)
 import Data.Maybe
   (mapMaybe)
 import qualified Data.Set
@@ -181,9 +179,9 @@ testCheck t = do
   filePath
     <- testFilePath t
   unusedLocal
-    <- checkUnusedWith Local (options rootPath) rootPath filePath
+    <- checkUnusedWith Local (options rootPath) filePath
   unusedGlobal
-    <- checkUnusedWith Global (options rootPath) rootPath filePath
+    <- checkUnusedWith Global (options rootPath) filePath
   _
     <- testUnused unusedLocal (mapMaybe privateMay (testResult t))
   _
@@ -198,7 +196,7 @@ testCheckExample = do
   filePath
     <- getDataFileName "data/example/Test.agda"
   unused
-    <- checkUnused (options rootPath) rootPath filePath
+    <- checkUnused (options rootPath) filePath
   _
     <- testUnusedExample unused
   pure ()
@@ -235,9 +233,9 @@ testUnusedOutput _
 
 options
   :: FilePath
-  -> CommandLineOptions
+  -> Options
 options p
-  = setIncludePaths [p] defaultOptions
+  = Options p [p]
 
 privateMay
   :: (Access, a)

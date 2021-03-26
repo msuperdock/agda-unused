@@ -6,7 +6,7 @@ Initial release.
 
 ## 0.2.0
 
-- Support external imports via the `--include-path` option.
+- Support all Agda library-related options (`--include-path`, etc.).
 - Remove support for `.agda-roots` file; use an ordinary Agda file instead.
 - Replace the `--local` option with a `--global` flag; default to a local check.
 - The `agda-unused` command now takes a filename as a positional argument.

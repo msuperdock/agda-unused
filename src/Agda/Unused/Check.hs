@@ -1818,31 +1818,45 @@ checkPath
   => [QName]
   -- ^ Visited modules.
   -> FilePath
+  -- ^ A path to ignore.
+  -> FilePath
   -- ^ The project root path.
   -> FilePath
   -- ^ The path at which to look.
   -> m [FilePath]
-checkPath ms p p'
-  = liftIO (doesDirectoryExist p')
-  >>= bool (pure (checkPathFile ms p p')) (checkPathDirectory ms p p')
+checkPath ns i r p
+  = liftIO (doesDirectoryExist p)
+  >>= bool (pure (checkPathFile ns i r p)) (checkPathDirectory ns i r p)
 
 checkPathFile
   :: [QName]
+  -- ^ Visited modules.
   -> FilePath
+  -- ^ A path to ignore.
   -> FilePath
+  -- ^ The project root path.
+  -> FilePath
+  -- ^ The path at which to look.
   -> [FilePath]
-checkPathFile ms p p'
-  = maybe [] (bool [p'] [] . flip elem ms) (pathQName p p')
+checkPathFile _ i _ p | i == p
+  = []
+checkPathFile ns _ r p
+  = maybe [] (bool [p] [] . flip elem ns) (pathQName r p)
 
 checkPathDirectory
   :: MonadIO m
   => [QName]
+  -- ^ Visited modules.
   -> FilePath
+  -- ^ A path to ignore.
   -> FilePath
+  -- ^ The project root path.
+  -> FilePath
+  -- ^ The path at which to look.
   -> m [FilePath]
-checkPathDirectory ms p p'
-  = fmap (p' </>) <$> liftIO (listDirectory p')
-  >>= traverse (checkPath ms p)
+checkPathDirectory ns i r p
+  = fmap (p </>) <$> liftIO (listDirectory p)
+  >>= traverse (checkPath ns i r)
   >>= pure . concat
 
 -- ## Main
@@ -1899,7 +1913,7 @@ checkUnusedGlobal' opts p = do
   state
     <- runUnusedT GlobalMain opts (checkFilePath Nothing p)
   files
-    <- checkPath (stateModules state) rootPath rootPath
+    <- checkPath (stateModules state) p rootPath rootPath
   items 
     <- pure (UnusedItems (filter (not . inFile p) (stateItems state)))
   unused

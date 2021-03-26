@@ -21,7 +21,7 @@ import Data.Text.Lazy
   (toStrict)
 import Options.Applicative
   (InfoMod, Parser, ParserInfo, execParser, fullDesc, header, help, helper,
-    info, long, many, metavar, optional, progDesc, short, strArgument,
+    hidden, info, long, many, metavar, optional, progDesc, short, strArgument,
     strOption, switch)
 import System.Directory
   (listDirectory, makeAbsolute)
@@ -97,8 +97,7 @@ optionsParser
 optionsParser
   = Options
   <$> (strArgument
-    $ metavar "FILE"
-    <> help "Path of file to check")
+    $ metavar "FILE")
   <*> optional (strOption
     $ short 'r'
     <> long "root"
@@ -116,22 +115,27 @@ optionsParser
     $ short 'i'
     <> long "include-path"
     <> metavar "DIR"
-    <> help "Look for imports in DIR")
+    <> help "Look for imports in DIR"
+    <> hidden)
   <*> many (strOption
     $ short 'l'
     <> long "library"
     <> metavar "LIB"
-    <> help "Use library LIB")
+    <> help "Use library LIB"
+    <> hidden)
   <*> optional (strOption
     $ long "library-file"
     <> metavar "FILE"
-    <> help "Use FILE instead of the standard libraries file")
+    <> help "Use FILE instead of the standard libraries file"
+    <> hidden)
   <*> (switch
     $ long "no-libraries"
-    <> help "Don't use any library files")
+    <> help "Don't use any library files"
+    <> hidden)
   <*> (switch
     $ long "no-default-libraries"
-    <> help "Don't use default libraries")
+    <> help "Don't use default libraries"
+    <> hidden)
 
 optionsInfo
   :: InfoMod a

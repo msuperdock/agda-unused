@@ -13,6 +13,9 @@ module Agda.Unused
 import Agda.Unused.Types.Range
   (Range, RangeInfo)
 
+import Data.Text
+  (Text)
+
 -- ## Types
 
 -- | A collection of unused items and files.
@@ -36,7 +39,15 @@ data UnusedOptions
   = UnusedOptions
   { unusedOptionsRoot
     :: FilePath
-  , unusedOptionsIncludes
+  , unusedOptionsInclude
     :: [FilePath]
+  , unusedOptionsLibraries
+    :: [Text]
+  , unusedOptionsLibrariesFile
+    :: Maybe FilePath
+  , unusedOptionsUseLibraries
+    :: Bool
+  , unusedOptionsUseDefaultLibraries
+    :: Bool
   } deriving Show
 

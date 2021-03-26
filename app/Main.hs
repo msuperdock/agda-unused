@@ -42,16 +42,55 @@ data Options
   , optionsRoot
     :: !(Maybe FilePath)
     -- ^ Path of the project root directory.
-  , optionsIncludes
-    :: ![FilePath]
-    -- ^ Include paths.
   , optionsGlobal
     :: !Bool
     -- ^ Whether to check project globally.
   , optionsJSON
     :: !Bool
     -- ^ Whether to format output as JSON.
+  , optionsInclude
+    :: ![FilePath]
+    -- ^ Include paths.
+  , optionsLibraries
+    :: ![Text]
+    -- ^ Libraries.
+  , optionsLibrariesFile
+    :: Maybe FilePath
+    -- ^ Alternate libraries file.
+  , optionsNoLibraries
+    :: Bool
+    -- ^ Whether to not use any library files.
+  , optionsNoDefaultLibraries
+    :: Bool
+    -- ^ Whether to not use default libraries.
   } deriving Show
+
+optionsUnused
+  :: Options
+  -> IO (FilePath, UnusedOptions)
+optionsUnused opts = do
+  filePath
+    <- makeAbsolute (optionsFile opts)
+  rootPath
+    <- getRootDirectory (optionsRoot opts) filePath
+  includePaths
+    <- traverse makeAbsolute (optionsInclude opts)
+  pure
+    $ (,) filePath
+    $ UnusedOptions
+    { unusedOptionsRoot
+      = rootPath
+    , unusedOptionsInclude
+      = includePaths
+    , unusedOptionsLibraries
+      = optionsLibraries opts
+    , unusedOptionsLibrariesFile
+      = optionsLibrariesFile opts
+    , unusedOptionsUseLibraries
+      = not (optionsNoLibraries opts)
+    , unusedOptionsUseDefaultLibraries
+      = not (optionsNoDefaultLibraries opts)
+    }
 
 optionsParser
   :: Parser Options
@@ -63,13 +102,8 @@ optionsParser
   <*> optional (strOption
     $ short 'r'
     <> long "root"
-    <> metavar "ROOT"
-    <> help "Path of project root directory")
-  <*> many (strOption
-    $ short 'i'
-    <> long "include-path"
     <> metavar "DIR"
-    <> help "Look for imports in DIR")
+    <> help "Path of project root directory")
   <*> (switch
     $ short 'g'
     <> long "global"
@@ -78,6 +112,26 @@ optionsParser
     $ short 'j'
     <> long "json"
     <> help "Format output as JSON")
+  <*> many (strOption
+    $ short 'i'
+    <> long "include-path"
+    <> metavar "DIR"
+    <> help "Look for imports in DIR")
+  <*> many (strOption
+    $ short 'l'
+    <> long "library"
+    <> metavar "LIB"
+    <> help "Use library LIB")
+  <*> optional (strOption
+    $ long "library-file"
+    <> metavar "FILE"
+    <> help "Use FILE instead of the standard libraries file")
+  <*> (switch
+    $ long "no-libraries"
+    <> help "Don't use any library files")
+  <*> (switch
+    $ long "no-default-libraries"
+    <> help "Don't use default libraries")
 
 optionsInfo
   :: InfoMod a
@@ -96,15 +150,11 @@ options
 check
   :: Options
   -> IO ()
-check (Options f r ps g j) = do
-  filePath
-    <- makeAbsolute f
-  rootPath
-    <- getRootDirectory r filePath
-  includePaths
-    <- traverse makeAbsolute ps
+check opts = do
+  (filePath, opts')
+    <- optionsUnused opts
   _
-    <- checkWith (UnusedOptions rootPath includePaths) filePath g j
+    <- checkWith opts' filePath (optionsGlobal opts) (optionsJSON opts)
   pure ()
 
 checkWith

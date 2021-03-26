@@ -233,7 +233,20 @@ unusedOptions
   :: FilePath
   -> UnusedOptions
 unusedOptions p
-  = UnusedOptions p [p]
+  = UnusedOptions
+  { unusedOptionsRoot
+    = p
+  , unusedOptionsInclude
+    = [p]
+  , unusedOptionsLibraries
+    = []
+  , unusedOptionsLibrariesFile
+    = Nothing
+  , unusedOptionsUseLibraries
+    = False
+  , unusedOptionsUseDefaultLibraries
+    = False
+  }
 
 privateMay
   :: (Access, a)

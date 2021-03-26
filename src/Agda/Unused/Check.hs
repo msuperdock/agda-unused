@@ -45,9 +45,7 @@ import Agda.Unused.Utils
 import Agda.Interaction.FindFile
   (findFile'', srcFilePath)
 import Agda.Interaction.Options
-  (defaultOptions)
-import Agda.Interaction.Options.Lenses
-  (setIncludePaths)
+  (CommandLineOptions(..), defaultOptions)
 import Agda.Syntax.Common
   (Arg(..), Fixity'(..), GenPart(..), ImportDirective'(..), ImportedName'(..),
     IsInstance, Named(..), Ranged(..), Renaming'(..), RewriteEqn'(..),
@@ -97,6 +95,8 @@ import qualified Data.Map.Strict
   as Map
 import Data.Maybe
   (catMaybes)
+import qualified Data.Text
+  as T
 import System.Directory
   (doesDirectoryExist, doesFileExist, listDirectory)
 import System.FilePath
@@ -1927,10 +1927,20 @@ runUnusedT m opts x = do
 setOptions
   :: UnusedOptions
   -> TCM ()
-setOptions (UnusedOptions _ is)
+setOptions opts
   = setCommandLineOptions
-  $ setIncludePaths is
   $ defaultOptions
+  { optIncludePaths
+    = unusedOptionsInclude opts
+  , optLibraries
+    = T.unpack <$> unusedOptionsLibraries opts
+  , optOverrideLibrariesFile
+    = unusedOptionsLibrariesFile opts
+  , optDefaultLibs
+    = unusedOptionsUseDefaultLibraries opts
+  , optUseLibs
+    = unusedOptionsUseLibraries opts
+  }
 
 inFile
   :: FilePath

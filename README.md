@@ -60,15 +60,25 @@ Output:
 ## Usage
 
 ```
-Usage: agda-unused FILE [-r|--root ROOT] [-g|--global] [-j|--json]
+agda-unused - check for unused code in an Agda project
+
+Usage: agda-unused FILE [-r|--root DIR] [-g|--global] [-j|--json]
+                   [-i|--include-path DIR] [-l|--library LIB]
+                   [--library-file FILE] [--no-libraries]
+                   [--no-default-libraries]
   Check for unused code in FILE
 
 Available options:
   -h,--help                Show this help text
   FILE                     Path of file to check
-  -r,--root ROOT           Path of project root directory
+  -r,--root DIR            Path of project root directory
   -g,--global              Check project globally
   -j,--json                Format output as JSON
+  -i,--include-path DIR    Look for imports in DIR
+  -l,--library LIB         Use library LIB
+  --library-file FILE      Use FILE instead of the standard libraries file
+  --no-libraries           Don't use any library files
+  --no-default-libraries   Don't use default libraries
 ```
 
 The project root directory is determined as follows:

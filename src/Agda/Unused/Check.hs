@@ -91,6 +91,8 @@ import Data.Bool
   (bool)
 import Data.Foldable
   (traverse_)
+import Data.List
+  (sort)
 import qualified Data.Map.Strict
   as Map
 import Data.Maybe
@@ -1812,8 +1814,21 @@ checkFilePath n p = do
 
 -- ## Paths
 
--- Look for unvisited modules at the given path.
+-- Look for unvisited modules.
 checkPath
+  :: MonadIO m
+  => [QName]
+  -- ^ Visited modules.
+  -> FilePath
+  -- ^ A path to ignore.
+  -> FilePath
+  -- ^ The project root path.
+  -> m [FilePath]
+checkPath ns i r
+  = sort <$> checkPath' ns i r r
+
+-- Look for unvisited modules at the given path.
+checkPath'
   :: MonadIO m
   => [QName]
   -- ^ Visited modules.
@@ -1824,7 +1839,7 @@ checkPath
   -> FilePath
   -- ^ The path at which to look.
   -> m [FilePath]
-checkPath ns i r p
+checkPath' ns i r p
   = liftIO (doesDirectoryExist p)
   >>= bool (pure (checkPathFile ns i r p)) (checkPathDirectory ns i r p)
 
@@ -1856,7 +1871,7 @@ checkPathDirectory
   -> m [FilePath]
 checkPathDirectory ns i r p
   = fmap (p </>) <$> liftIO (listDirectory p)
-  >>= traverse (checkPath ns i r)
+  >>= traverse (checkPath' ns i r)
   >>= pure . concat
 
 -- ## Main
@@ -1908,12 +1923,10 @@ checkUnusedGlobal'
   -> FilePath
   -> ExceptT Error m Unused
 checkUnusedGlobal' opts p = do
-  rootPath
-    <- pure (unusedOptionsRoot opts)
   state
     <- runUnusedT GlobalMain opts (checkFilePath Nothing p)
   files
-    <- checkPath (stateModules state) p rootPath rootPath
+    <- checkPath (stateModules state) p (unusedOptionsRoot opts)
   items 
     <- pure (UnusedItems (filter (not . inFile p) (stateItems state)))
   unused

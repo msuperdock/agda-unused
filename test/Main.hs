@@ -1,15 +1,13 @@
 module Main where
 
 import Agda.Unused
-  (UnusedItems(..))
+  (UnusedItems(..), UnusedOptions(..))
 import Agda.Unused.Check
   (checkUnused, checkUnusedWith)
 import Agda.Unused.Monad.Error
   (Error)
 import Agda.Unused.Monad.Reader
   (Mode(..))
-import Agda.Unused.Options
-  (Options(..))
 import Agda.Unused.Print
   (printError, printUnusedItems)
 import Agda.Unused.Types.Access
@@ -179,9 +177,9 @@ testCheck t = do
   filePath
     <- testFilePath t
   unusedLocal
-    <- checkUnusedWith Local (options rootPath) filePath
+    <- checkUnusedWith Local (unusedOptions rootPath) filePath
   unusedGlobal
-    <- checkUnusedWith Global (options rootPath) filePath
+    <- checkUnusedWith Global (unusedOptions rootPath) filePath
   _
     <- testUnused unusedLocal (mapMaybe privateMay (testResult t))
   _
@@ -196,7 +194,7 @@ testCheckExample = do
   filePath
     <- getDataFileName "data/example/Test.agda"
   unused
-    <- checkUnused (options rootPath) filePath
+    <- checkUnused (unusedOptions rootPath) filePath
   _
     <- testUnusedExample unused
   pure ()
@@ -231,11 +229,11 @@ testUnusedOutput (Just [t0, t1, t2, t3, t4, t5])
 testUnusedOutput _
   = expectationFailure ""
 
-options
+unusedOptions
   :: FilePath
-  -> Options
-options p
-  = Options p [p]
+  -> UnusedOptions
+unusedOptions p
+  = UnusedOptions p [p]
 
 privateMay
   :: (Access, a)

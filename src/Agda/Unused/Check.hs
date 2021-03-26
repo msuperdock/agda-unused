@@ -10,7 +10,7 @@ module Agda.Unused.Check
   ) where
 
 import Agda.Unused
-  (Unused(..), UnusedItems(..))
+  (Unused(..), UnusedItems(..), UnusedOptions(..))
 import Agda.Unused.Monad.Error
   (Error(..), InternalError(..), UnexpectedError(..), UnsupportedError(..),
     liftLookup)
@@ -21,8 +21,6 @@ import Agda.Unused.Monad.State
   (ModuleState(..), State, getModule, getSources, modifyBlock, modifyCheck,
     modifyDelete, modifyInsert, modifySources, stateEmpty, stateItems,
     stateModules)
-import Agda.Unused.Options
-  (Options(..), setOptions)
 import Agda.Unused.Types.Access
   (Access(..), fromAccess)
 import Agda.Unused.Types.Context
@@ -46,6 +44,10 @@ import Agda.Unused.Utils
 
 import Agda.Interaction.FindFile
   (findFile'', srcFilePath)
+import Agda.Interaction.Options
+  (defaultOptions)
+import Agda.Interaction.Options.Lenses
+  (setIncludePaths)
 import Agda.Syntax.Common
   (Arg(..), Fixity'(..), GenPart(..), ImportDirective'(..), ImportedName'(..),
     IsInstance, Named(..), Ranged(..), Renaming'(..), RewriteEqn'(..),
@@ -72,7 +74,9 @@ import Agda.Syntax.Parser
 import Agda.Syntax.Position
   (Range, getRange)
 import Agda.TypeChecking.Monad.Base
-  (getIncludeDirs, runTCMTop)
+  (TCM, getIncludeDirs, runTCMTop)
+import Agda.TypeChecking.Monad.Options
+  (setCommandLineOptions)
 import Agda.Utils.FileName
   (filePath, mkAbsolute)
 import Control.Monad
@@ -1846,7 +1850,7 @@ checkPathDirectory ms p p'
 -- | Check an Agda file and its dependencies for unused code, excluding public
 -- items that could be imported elsewhere.
 checkUnused
-  :: Options
+  :: UnusedOptions
   -- ^ Options to use.
   -> FilePath
   -- ^ Absolute path of the file to check.
@@ -1859,7 +1863,7 @@ checkUnused
 checkUnusedWith
   :: Mode
   -- ^ The check mode to use.
-  -> Options
+  -> UnusedOptions
   -- ^ Options to use.
   -> FilePath
   -- ^ Absolute path of the file to check.
@@ -1876,7 +1880,7 @@ checkUnusedWith m opts
 -- The given file should consist only of import statements; it serves as a
 -- full description of the public interface of the project.
 checkUnusedGlobal
-  :: Options
+  :: UnusedOptions
   -- ^ Options to use.
   -> FilePath
   -- ^ Absolute path of the file to check.
@@ -1886,14 +1890,16 @@ checkUnusedGlobal opts p
 
 checkUnusedGlobal'
   :: MonadIO m
-  => Options
+  => UnusedOptions
   -> FilePath
   -> ExceptT Error m Unused
 checkUnusedGlobal' opts p = do
+  rootPath
+    <- pure (unusedOptionsRoot opts)
   state
     <- runUnusedT GlobalMain opts (checkFilePath Nothing p)
   files
-    <- checkPath (stateModules state) (optionsRoot opts) (optionsRoot opts)
+    <- checkPath (stateModules state) rootPath rootPath
   items 
     <- pure (UnusedItems (filter (not . inFile p) (stateItems state)))
   unused
@@ -1904,12 +1910,12 @@ runUnusedT
   :: MonadError Error m
   => MonadIO m
   => Mode
-  -> Options
+  -> UnusedOptions
   -> ReaderT Environment (StateT State m) a
   -> m State
 runUnusedT m opts x = do
   rootPath
-    <- pure (optionsRoot opts)
+    <- pure (unusedOptionsRoot opts)
   includesEither
     <- liftIO (runTCMTop (setOptions opts >> getIncludeDirs))
   includes
@@ -1917,6 +1923,14 @@ runUnusedT m opts x = do
   (_, state)
     <- runStateT (runReaderT x (Environment m rootPath includes)) stateEmpty
   pure state
+
+setOptions
+  :: UnusedOptions
+  -> TCM ()
+setOptions (UnusedOptions _ is)
+  = setCommandLineOptions
+  $ setIncludePaths is
+  $ defaultOptions
 
 inFile
   :: FilePath

@@ -7,6 +7,7 @@ of unused Agda code structures.
 module Agda.Unused
   ( Unused(..)
   , UnusedItems(..)
+  , UnusedOptions(..)
   ) where
 
 import Agda.Unused.Types.Range
@@ -28,5 +29,14 @@ newtype UnusedItems
   = UnusedItems
   { unusedItemsList
     :: [(Range, RangeInfo)]
+  } deriving Show
+
+-- | Options required by check functions.
+data UnusedOptions
+  = UnusedOptions
+  { unusedOptionsRoot
+    :: FilePath
+  , unusedOptionsIncludes
+    :: [FilePath]
   } deriving Show
 

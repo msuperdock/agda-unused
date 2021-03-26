@@ -1,11 +1,11 @@
 module Main where
 
+import Agda.Unused
+  (UnusedOptions(..))
 import Agda.Unused.Check
   (checkUnused, checkUnusedGlobal)
 import qualified Agda.Unused.Monad.Error
   as E
-import qualified Agda.Unused.Options
-  as O
 import qualified Agda.Unused.Print
   as P
 
@@ -104,11 +104,11 @@ check (Options f r ps g j) = do
   includePaths
     <- traverse makeAbsolute ps
   _
-    <- checkWith (O.Options rootPath includePaths) filePath g j
+    <- checkWith (UnusedOptions rootPath includePaths) filePath g j
   pure ()
 
 checkWith
-  :: O.Options
+  :: UnusedOptions
   -- ^ Options to use.
   -> FilePath
   -- ^ Absolute path of the file to check.

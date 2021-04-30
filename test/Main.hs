@@ -66,6 +66,13 @@ agdaBuiltinBool
   $ Qual (Name [Id "Builtin"])
   $ QName (Name [Id "Bool"])
 
+agdaBuiltinNat
+  :: QName
+agdaBuiltinNat
+  = Qual (Name [Id "Agda"])
+  $ Qual (Name [Id "Builtin"])
+  $ QName (Name [Id "Nat"])
+
 -- ## Ranges
 
 data RangeType where
@@ -691,6 +698,8 @@ testResult t
 
   Declaration Import' ->
     [ private agdaBuiltinBool
+      ~: Import
+    , private agdaBuiltinNat
       ~: Import
     , private (name "tt")
       ~: ImportItem

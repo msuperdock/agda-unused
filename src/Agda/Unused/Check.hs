@@ -313,6 +313,20 @@ checkModuleName c a r n
   >> contextInsertRangeAll r c
   >>= \c' -> pure (accessContextModule n (AccessModule a [r] c'))
 
+checkModuleNameMay
+  :: MonadReader Environment m
+  => MonadState State m
+  => Context
+  -> Access
+  -> Range
+  -> Maybe Name
+  -- ^ If `Nothing`, the module is anonymous.
+  -> m AccessContext
+checkModuleNameMay _ _ _ Nothing
+  = pure mempty
+checkModuleNameMay c a r (Just n)
+  = checkModuleName c a r n
+
 touchName
   :: MonadReader Environment m
   => MonadState State m
@@ -907,9 +921,9 @@ checkWhereClause c (AnyWhere ds)
   = checkDeclarations c ds
   >>= \c' -> pure (mempty, c')
 checkWhereClause c (SomeWhere n a ds)
-  = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromName n)
-  >>= \n' -> checkDeclarations c ds
-  >>= \c' -> checkModuleName (toContext c') (fromAccess a) (getRange n) n'
+  = checkDeclarations c ds
+  >>= \c' -> checkModuleNameMay (toContext c') (fromAccess a) (getRange n)
+    (fromName n)
   >>= \c'' -> pure (c'' , c')
 
 checkRewriteEqn
@@ -1243,16 +1257,14 @@ checkNiceDeclaration' _ _ (NiceImport r n Nothing DoOpen i)
     <> fromContext (importDirectiveAccess i) c'')
 checkNiceDeclaration' _ _ (NiceImport r n (Just a) DontOpen i)
   = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromQName n)
-  >>= \n' -> liftMaybe (ErrorInternal (ErrorName (getRange a))) (fromAsName a)
-  >>= \a' -> checkFile r n'
+  >>= \n' -> checkFile r n'
   >>= \c' -> checkImportDirective Import r n' c' i
-  >>= \c'' -> checkModuleName c'' Public (getRange a) a'
+  >>= \c'' -> checkModuleNameMay c'' Public (getRange a) (fromAsName a)
 checkNiceDeclaration' _ _ (NiceImport r n (Just a) DoOpen i)
   = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromQName n)
-  >>= \n' -> liftMaybe (ErrorInternal (ErrorName (getRange a))) (fromAsName a)
-  >>= \a' -> checkFile r n'
+  >>= \n' -> checkFile r n'
   >>= \c' -> checkImportDirective Import r n' c' i
-  >>= \c'' -> checkModuleName c' Public (getRange a) a'
+  >>= \c'' -> checkModuleNameMay c' Public (getRange a) (fromAsName a)
   >>= \c''' -> pure (c''' <> fromContext (importDirectiveAccess i) c'')
 
 checkNiceDeclaration' fs c (NicePatternSyn _ a n ns p)

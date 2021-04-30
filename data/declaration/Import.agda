@@ -1,8 +1,11 @@
 module Import where
 
+import Agda.Builtin.Bool
+  as _
+open import Agda.Builtin.Nat
+  as _
 import Agda.Builtin.Unit
   using (⊤; tt)
-import Agda.Builtin.Bool
 
 A
   : Set

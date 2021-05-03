@@ -9,12 +9,20 @@ import Agda.Unused.Monad.Error
 import Agda.Unused.Print
   (printError, printNothing, printUnused, printUnusedItems)
 
+import Control.Monad
+  (unless)
+import Control.Monad.Except
+  (MonadError, runExceptT, throwError)
+import Control.Monad.IO.Class
+  (MonadIO, liftIO)
 import Data.Aeson
   (Value(..), (.=), object)
 import Data.Aeson.Text
   (encodeToLazyText)
 import Data.Text
   (Text)
+import qualified Data.Text
+  as T
 import qualified Data.Text.IO
   as I
 import Data.Text.Lazy
@@ -24,7 +32,7 @@ import Options.Applicative
     hidden, info, long, many, metavar, optional, progDesc, short, strArgument,
     strOption, switch)
 import System.Directory
-  (listDirectory, makeAbsolute)
+  (doesDirectoryExist, doesFileExist, listDirectory, makeAbsolute)
 import System.Exit
   (exitFailure, exitSuccess)
 import System.FilePath
@@ -149,12 +157,99 @@ options
 options
   = info (helper <*> optionsParser) optionsInfo
 
+-- ## Validate
+
+data OptionsError where
+
+  ErrorFile
+    :: FilePath
+    -> OptionsError
+
+  ErrorDirectory
+    :: FilePath
+    -> OptionsError
+
+  deriving Show
+
+printOptionsError
+  :: OptionsError
+  -> Text
+printOptionsError (ErrorFile p)
+  = "Error: File not found " <> parens (T.pack p) <> "."
+printOptionsError (ErrorDirectory p)
+  = "Error: Directory not found " <> parens (T.pack p) <> "."
+
+parens
+  :: Text
+  -> Text
+parens t
+  = "(" <> t <> ")"
+
+validateFile
+  :: MonadError OptionsError m
+  => MonadIO m
+  => FilePath
+  -> m ()
+validateFile p = do
+  exists
+    <- liftIO (doesFileExist p)
+  _
+    <- unless exists (throwError (ErrorFile p))
+  pure ()
+
+validateDirectory
+  :: MonadError OptionsError m
+  => MonadIO m
+  => FilePath
+  -> m ()
+validateDirectory p = do
+  exists
+    <- liftIO (doesDirectoryExist p)
+  _
+    <- unless exists (throwError (ErrorDirectory p))
+  pure ()
+
+validateOptions
+  :: MonadError OptionsError m
+  => MonadIO m
+  => Options
+  -> m ()
+validateOptions opts = do
+  _
+    <- validateFile (optionsFile opts)
+  _
+    <- traverse validateDirectory (optionsRoot opts)
+  _
+    <- traverse validateFile (optionsInclude opts)
+  _
+    <- traverse validateFile (optionsLibrariesFile opts)
+  pure ()
+
+
+-- Validate options; print error message & exit on failure.
+validateOptions'
+  :: Options
+  -> IO ()
+validateOptions' opts
+  = runExceptT (validateOptions opts)
+  >>= validateOptionsEither
+
+validateOptionsEither
+  :: Either OptionsError ()
+  -> IO ()
+validateOptionsEither (Left e)
+  = I.hPutStrLn stderr (printOptionsError e) >> exitFailure
+validateOptionsEither (Right _)
+  = pure ()
+
 -- ## Check
 
 check
   :: Options
   -> IO ()
 check opts = do
+  _
+    <- validateOptions' opts
   (filePath, opts')
     <- optionsUnused opts
   _

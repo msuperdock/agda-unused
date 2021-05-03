@@ -25,13 +25,14 @@ import Agda.Unused.Types.Access
   (Access(..), fromAccess)
 import Agda.Unused.Types.Context
   (AccessContext, AccessModule(..), Context, LookupError(..),
-    accessContextDefine, accessContextImport, accessContextItem,
+    accessContextConstructor, accessContextDefine, accessContextDefineFields,
+    accessContextField, accessContextImport, accessContextItem,
     accessContextLookup, accessContextLookupDefining, accessContextLookupModule,
     accessContextLookupSpecial, accessContextMatch, accessContextModule,
-    accessContextModule', accessContextRanges, accessContextUnion,
-    contextDelete, contextDeleteModule, contextItem, contextLookupItem,
-    contextLookupModule, contextModule, contextRanges, fromContext, item,
-    itemConstructor, itemPattern, moduleRanges, toContext)
+    accessContextModule', accessContextPattern, accessContextRanges,
+    accessContextUnion, contextDelete, contextDeleteModule, contextItem,
+    contextLookupItem, contextLookupModule, contextModule, contextRanges,
+    fromContext, moduleRanges, toContext)
 import qualified Agda.Unused.Types.Context
   as C
 import Agda.Unused.Types.Name
@@ -223,7 +224,7 @@ checkName _ _ _ _ _ (Name [Hole])
   = pure mempty
 checkName p fs a t r@(Range _ _) n
   = modifyInsert r (RangeNamed t (QName n))
-  >> pure (accessContextItem n a (bool item itemPattern p [r] (syntax fs n)))
+  >> pure (bool accessContextItem accessContextPattern p n a [r] (syntax fs n))
 
 checkName'
   :: MonadReader Environment m
@@ -1324,11 +1325,10 @@ checkNiceDeclarationRecord _ _ fs c d@(NiceUnquoteDef _ _ _ _ _ _ _)
   = checkNiceDeclaration fs c d
 
 checkNiceDeclarationRecord n rs fs c (NiceField _ a _ _ _ n' (Arg _ e))
-  = checkExpr (accessContextDefine n c) e
+  = checkExpr (accessContextDefine n (accessContextDefineFields c)) e
   >> maybe
     (pure mempty)
-    (\n'' -> pure (accessContextItem n'' (fromAccess a)
-      (item rs (syntax fs n''))))
+    (\n'' -> pure (accessContextField n'' (fromAccess a) rs (syntax fs n'')))
     (fromName n')
 
 checkNiceDeclarations
@@ -1450,8 +1450,8 @@ checkNiceConstructor fs rs c (Axiom _ a _ _ _ n e)
   = checkExpr c e
   >> maybe
     (pure mempty)
-    (\n'' -> pure (accessContextItem n'' (fromAccess a)
-      (itemConstructor rs (syntax fs n''))))
+    (\n'' -> pure (accessContextConstructor n'' (fromAccess a) rs
+      (syntax fs n'')))
     (fromName n)
 checkNiceConstructor _ _ _ d
   = throwError (ErrorInternal (ErrorConstructor (getRange d)))
@@ -1481,7 +1481,7 @@ checkNiceConstructorRecord
   -> m AccessContext
 checkNiceConstructorRecord fs rs r n
   = modifyInsert r (RangeNamed RangeRecordConstructor (QName n))
-  >> pure (accessContextItem n Public (itemConstructor (r : rs) (syntax fs n)))
+  >> pure (accessContextConstructor n Public (r : rs) (syntax fs n))
 
 checkNiceConstructorRecordMay
   :: MonadReader Environment m

@@ -612,6 +612,8 @@ testResult t
       ~: Record
     , public (name "D")
       ~: Record
+    , public (name "F")
+      ~: Record
     , public (name "c")
       ~: RecordConstructor
     , public (name "x")

@@ -39,3 +39,15 @@ record D
   : Set
   where
 
+record F
+  : Set₁
+  where
+
+  field
+
+    G
+      : Set
+
+    z
+      : G
+

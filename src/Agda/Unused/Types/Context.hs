@@ -40,6 +40,7 @@ module Agda.Unused.Types.Context
     -- ** Define
 
   , accessContextDefine
+  , accessContextDefineFields
 
     -- ** Ranges
 
@@ -53,11 +54,11 @@ module Agda.Unused.Types.Context
 
     -- * Construction
 
-  , item
-  , itemPattern
-  , itemConstructor
   , contextItem
   , contextModule
+  , accessContextConstructor
+  , accessContextPattern
+  , accessContextField
   , accessContextItem
   , accessContextModule
   , accessContextModule'
@@ -111,6 +112,30 @@ data Item where
 
   deriving Show
 
+data Defining where
+
+  Defining
+    :: Defining
+
+  NotDefiningField
+    :: Defining
+
+  NotDefining
+    :: Defining
+
+  deriving Show
+
+-- Whether the item represents a constructor or pattern.
+data Special where
+
+  Special
+    :: Special
+
+  NotSpecial
+    :: Special
+
+  deriving Show
+
 -- Like 'Item', but with some additional data:
 --
 -- - Whether the name is public or private.
@@ -121,14 +146,14 @@ data Item where
 data AccessItem where
 
   AccessItemConstructor
-    -- Private ranges.
     :: ![Range]
-    -- Public ranges.
+    -- ^ Private ranges.
     -> ![Range]
-    -- Private syntax.
+    -- ^ Public ranges.
     -> ![Name]
-    -- Public syntax.
+    -- ^ Private syntax.
     -> ![Name]
+    -- ^ Public syntax.
     -> AccessItem
 
   AccessItemPattern
@@ -138,14 +163,13 @@ data AccessItem where
     -> AccessItem
 
   AccessItemSyntax
-    -- Whether the item is special.
-    :: !Bool
+    :: !Defining
+    -> !Special
     -> ![Range]
     -> AccessItem
 
   AccessItem
-    -- Whether we are currently defining this item.
-    :: !Bool
+    :: !Defining
     -> !Access
     -> ![Range]
     -> !(Maybe Name)
@@ -380,8 +404,10 @@ resolve (_ : _ : _)
 accessItemDefining
   :: AccessItem
   -> Bool
-accessItemDefining (AccessItem b _ _ _)
-  = b
+accessItemDefining (AccessItem Defining _ _ _)
+  = True
+accessItemDefining (AccessItemSyntax Defining _ _)
+  = True
 accessItemDefining _
   = False
 
@@ -435,14 +461,14 @@ accessItemInsertRange
   :: Range
   -> AccessItem
   -> AccessItem
-accessItemInsertRange r (AccessItemConstructor rs1 rs2 ns1 ns2)
-  = AccessItemConstructor (r : rs1) (r : rs2) ns1 ns2
-accessItemInsertRange r (AccessItemPattern a rs n)
-  = AccessItemPattern a (r : rs) n
-accessItemInsertRange r (AccessItemSyntax b rs)
-  = AccessItemSyntax b (r : rs)
-accessItemInsertRange r (AccessItem b a rs n)
-  = AccessItem b a (r : rs) n
+accessItemInsertRange r (AccessItemConstructor rs1 rs2 ss1 ss2)
+  = AccessItemConstructor (r : rs1) (r : rs2) ss1 ss2
+accessItemInsertRange r (AccessItemPattern a rs s)
+  = AccessItemPattern a (r : rs) s
+accessItemInsertRange r (AccessItemSyntax d s rs)
+  = AccessItemSyntax d s (r : rs)
+accessItemInsertRange r (AccessItem i a rs s)
+  = AccessItem i a (r : rs) s
 
 moduleInsertRangeAll
   :: Range
@@ -502,8 +528,20 @@ accessItemDefine
   :: AccessItem
   -> AccessItem
 accessItemDefine (AccessItem _ a rs s)
-  = AccessItem True a rs s
+  = AccessItem Defining a rs s
+accessItemDefine (AccessItemSyntax _ s rs)
+  = AccessItemSyntax Defining s rs
 accessItemDefine i
+  = i
+
+accessItemDefineField
+  :: AccessItem
+  -> AccessItem
+accessItemDefineField (AccessItem NotDefiningField a rs s)
+  = AccessItem Defining a rs s
+accessItemDefineField (AccessItemSyntax NotDefiningField s rs)
+  = AccessItemSyntax Defining s rs
+accessItemDefineField i
   = i
 
 -- | Mark an existing name as in process of being defined.
@@ -513,6 +551,13 @@ accessContextDefine
   -> AccessContext
 accessContextDefine n (AccessContext is ms js)
   = AccessContext (Map.adjust accessItemDefine n is) ms js
+
+-- | Mark all fields as in process of being defined.
+accessContextDefineFields
+  :: AccessContext
+  -> AccessContext
+accessContextDefineFields (AccessContext is ms js)
+  = AccessContext (Map.map accessItemDefineField is) ms js
 
 -- ### Ranges
 
@@ -568,32 +613,6 @@ accessContextMatch ss (AccessContext is _ _)
 
 -- ## Construction
 
--- | Construct an 'Item' representing an ordinary definition.
-item
-  :: [Range]
-  -> Maybe Name
-  -> Item
-item
-  = Item
-
--- | Construct an 'Item' representing a pattern synonym.
-itemPattern
-  :: [Range]
-  -> Maybe Name
-  -> Item
-itemPattern
-  = ItemPattern
-
--- | Construct an 'Item' representing a constructor.
-itemConstructor
-  :: [Range]
-  -> Maybe Name
-  -> Item
-itemConstructor rs Nothing
-  = ItemConstructor rs []
-itemConstructor rs (Just s)
-  = ItemConstructor rs [s]
-
 -- | Construct a 'Context' with a single item.
 contextItem
   :: Name
@@ -610,14 +629,54 @@ contextModule
 contextModule n m
   = Context mempty (Map.singleton n m)
 
--- | Construct an 'AccessContext' with a single item, along with the relevant
--- syntax item if applicable.
+-- | Construct an 'AccessContext' with a single constructor.
+accessContextConstructor
+  :: Name
+  -> Access
+  -> [Range]
+  -> Maybe Name
+  -> AccessContext
+accessContextConstructor n a rs s
+  = accessContextItem' n a (ItemConstructor rs (maybe [] (: []) s))
+
+-- | Construct an 'AccessContext' with a single pattern synonym.
+accessContextPattern
+  :: Name
+  -> Access
+  -> [Range]
+  -> Maybe Name
+  -> AccessContext
+accessContextPattern n a rs s
+  = accessContextItem' n a (ItemPattern rs s)
+
+-- | Construct an 'AccessContext' with a single field.
+accessContextField
+  :: Name
+  -> Access
+  -> [Range]
+  -> Maybe Name
+  -> AccessContext
+accessContextField n a rs s
+  = toFields (accessContextItem' n a (Item rs s))
+
+-- | Construct an 'AccessContext' with a single ordinary definition.
 accessContextItem
+  :: Name
+  -> Access
+  -> [Range]
+  -> Maybe Name
+  -> AccessContext
+accessContextItem n a rs s
+  = accessContextItem' n a (Item rs s)
+
+-- Construct an 'AccessContext' with a single item, along with the relevant
+-- syntax item if applicable.
+accessContextItem'
   :: Name
   -> Access
   -> Item
   -> AccessContext
-accessContextItem n a i
+accessContextItem' n a i
   = fromContext a (contextItem n i)
 
 -- | Construct an 'AccessContext' with a single access module.
@@ -665,17 +724,17 @@ fromItem Public (ItemConstructor rs ss)
 fromItem a (ItemPattern rs s)
   = AccessItemPattern a rs s
 fromItem a (Item rs s)
-  = AccessItem False a rs s
+  = AccessItem NotDefining a rs s
 
 fromItemSyntax
   :: Item
   -> [(Name, AccessItem)]
 fromItemSyntax (ItemConstructor rs ss)
-  = flip (,) (AccessItemSyntax True rs) <$> ss
+  = flip (,) (AccessItemSyntax NotDefining Special rs) <$> ss
 fromItemSyntax (ItemPattern rs s)
-  = flip (,) (AccessItemSyntax True rs) <$> maybe [] (: []) s
+  = flip (,) (AccessItemSyntax NotDefining Special rs) <$> maybe [] (: []) s
 fromItemSyntax (Item rs s)
-  = flip (,) (AccessItemSyntax False rs) <$> maybe [] (: []) s
+  = flip (,) (AccessItemSyntax NotDefining NotSpecial rs) <$> maybe [] (: []) s
 
 toItem
   :: AccessItem
@@ -696,7 +755,7 @@ toItem' (AccessItemConstructor rs1 rs2 ss1 ss2)
   = ItemConstructor (rs1 <> rs2) (ss1 <> ss2)
 toItem' (AccessItemPattern _ rs s)
   = ItemPattern rs s
-toItem' (AccessItemSyntax _ rs)
+toItem' (AccessItemSyntax _ _ rs)
   = Item rs Nothing
 toItem' (AccessItem _ _ rs s)
   = Item rs s
@@ -746,4 +805,21 @@ toContext'
   -> Context
 toContext' (AccessContext is ms _)
   = Context (Map.map toItem' is) (Map.map toModule' ms)
+
+toField
+  :: AccessItem
+  -> AccessItem
+toField (AccessItem _ a rs s)
+  = AccessItem NotDefiningField a rs s
+toField (AccessItemSyntax _ s rs)
+  = AccessItemSyntax NotDefiningField s rs
+toField i
+  = i
+
+-- Convert all ordinary & syntax items to fields.
+toFields
+  :: AccessContext
+  -> AccessContext
+toFields (AccessContext is ms js)
+  = AccessContext (Map.map toField is) ms js
 

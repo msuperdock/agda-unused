@@ -82,6 +82,10 @@ data Error where
     :: !Range
     -> Error
 
+  -- | Error in computing include paths.
+  ErrorInclude
+    :: Error
+
   -- | Internal error; should be reported.
   ErrorInternal
     :: !InternalError
@@ -123,10 +127,6 @@ data InternalError where
   ErrorConstructor
     :: !Range
     -> InternalError
-
-  -- | Unexpected error in computing include paths.
-  ErrorInclude
-    :: InternalError
 
   -- | Unexpected arguments to SectionApp constructor.
   ErrorMacro

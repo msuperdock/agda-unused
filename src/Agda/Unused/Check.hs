@@ -1958,7 +1958,7 @@ runUnusedT m opts x = do
   includesEither
     <- liftIO (runTCMTop (setOptions opts >> getIncludeDirs))
   includes
-    <- liftEither (mapLeft (const (ErrorInternal ErrorInclude)) includesEither)
+    <- liftEither (mapLeft (const ErrorInclude) includesEither)
   (_, state)
     <- runStateT (runReaderT x (Environment m rootPath includes)) stateEmpty
   pure state

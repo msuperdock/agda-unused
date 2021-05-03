@@ -140,6 +140,8 @@ printError (ErrorFile p)
   = printErrorFile p
 printError (ErrorFixity Nothing)
   = "Error: Multiple fixity declarations."
+printError ErrorInclude
+  = "Error: Invalid path-related options."
 printError (ErrorInternal e)
   = printInternalError e
 printError (ErrorParse e)
@@ -172,9 +174,6 @@ printInternalError (ErrorUnexpected e r)
   = printMessage (printRange r)
   $ "Internal error: Unexpected constructor "
     <> quote (printUnexpectedError e) <> "."
-
-printInternalError ErrorInclude
-  = "Internal error: Unable to compute include paths."
 
 printUnexpectedError
   :: UnexpectedError

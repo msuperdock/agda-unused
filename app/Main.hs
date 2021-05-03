@@ -4,10 +4,10 @@ import Agda.Unused
   (UnusedOptions(..))
 import Agda.Unused.Check
   (checkUnused, checkUnusedGlobal)
-import qualified Agda.Unused.Monad.Error
-  as E
-import qualified Agda.Unused.Print
-  as P
+import Agda.Unused.Monad.Error
+  (Error)
+import Agda.Unused.Print
+  (printError, printNothing, printUnused, printUnusedItems)
 
 import Data.Aeson
   (Value(..), (.=), object)
@@ -173,10 +173,10 @@ checkWith
   -> IO ()
 checkWith opts p False j
   = checkUnused opts p
-  >>= printResult j P.printUnusedItems
+  >>= printResult j printUnusedItems
 checkWith opts p True j
   = checkUnusedGlobal opts p
-  >>= printResult j P.printUnused
+  >>= printResult j printUnused
 
 -- ## Print
 
@@ -184,23 +184,23 @@ printResult
   :: Bool
   -- ^ Whether to output JSON.
   -> (a -> Maybe Text)
-  -> Either E.Error a
+  -> Either Error a
   -> IO ()
 printResult False _ (Left e)
-  = I.hPutStrLn stderr (P.printError e) >> exitFailure
+  = I.hPutStrLn stderr (printError e) >> exitFailure
 printResult False p (Right x)
-  = I.putStrLn (maybe P.printNothing id (p x)) >> exitSuccess
+  = I.putStrLn (maybe printNothing id (p x)) >> exitSuccess
 printResult True p x
   = I.putStrLn (toStrict (encodeToLazyText (printResultJSON p x)))
 
 printResultJSON
   :: (a -> Maybe Text)
-  -> Either E.Error a
+  -> Either Error a
   -> Value
 printResultJSON _ (Left e)
-  = encodeMessage "error" (P.printError e)
+  = encodeMessage "error" (printError e)
 printResultJSON p (Right u)
-  = maybe (encodeMessage "none" P.printNothing) (encodeMessage "unused") (p u)
+  = maybe (encodeMessage "none" printNothing) (encodeMessage "unused") (p u)
 
 encodeMessage
   :: Text

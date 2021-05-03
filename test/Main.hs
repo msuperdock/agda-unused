@@ -241,9 +241,7 @@ unusedOptions
   -> UnusedOptions
 unusedOptions p
   = UnusedOptions
-  { unusedOptionsRoot
-    = p
-  , unusedOptionsInclude
+  { unusedOptionsInclude
     = [p]
   , unusedOptionsLibraries
     = []

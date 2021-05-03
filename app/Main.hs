@@ -47,9 +47,6 @@ data Options
   { optionsFile
     :: !FilePath
     -- ^ Path of the file to check.
-  , optionsRoot
-    :: !(Maybe FilePath)
-    -- ^ Path of the project root directory.
   , optionsGlobal
     :: !Bool
     -- ^ Whether to check project globally.
@@ -79,16 +76,12 @@ optionsUnused
 optionsUnused opts = do
   filePath
     <- makeAbsolute (optionsFile opts)
-  rootPath
-    <- getRootDirectory (optionsRoot opts) filePath
   includePaths
     <- traverse makeAbsolute (optionsInclude opts)
   pure
     $ (,) filePath
     $ UnusedOptions
-    { unusedOptionsRoot
-      = rootPath
-    , unusedOptionsInclude
+    { unusedOptionsInclude
       = includePaths
     , unusedOptionsLibraries
       = optionsLibraries opts
@@ -106,11 +99,6 @@ optionsParser
   = Options
   <$> (strArgument
     $ metavar "FILE")
-  <*> optional (strOption
-    $ short 'r'
-    <> long "root"
-    <> metavar "DIR"
-    <> help "Path of project root directory")
   <*> (switch
     $ short 'g'
     <> long "global"
@@ -217,8 +205,6 @@ validateOptions
 validateOptions opts = do
   _
     <- validateFile (optionsFile opts)
-  _
-    <- traverse validateDirectory (optionsRoot opts)
   _
     <- traverse validateFile (optionsInclude opts)
   _

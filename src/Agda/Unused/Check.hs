@@ -59,13 +59,14 @@ import Agda.Syntax.Concrete
     LamBinding, LamBinding'(..), LamClause(..), LHS(..), Module,
     ModuleApplication(..), ModuleAssignment(..), OpenShortHand(..), Pattern(..),
     RecordAssignment, Renaming, RewriteEqn, RHS, RHS'(..), TypedBinding,
-    TypedBinding'(..), WhereClause, WhereClause'(..), _exprFieldA)
+    TypedBinding'(..), WhereClause, WhereClause'(..), _exprFieldA,
+    topLevelModuleName)
 import Agda.Syntax.Concrete.Definitions
   (Clause(..), NiceConstructor, NiceDeclaration(..), niceDeclarations, runNice)
 import Agda.Syntax.Concrete.Fixity
   (DoWarn(..), Fixities, fixitiesAndPolarities)
 import Agda.Syntax.Concrete.Name
-  (NameInScope(..), NamePart(..), nameRange, toTopLevelModuleName)
+  (NameInScope(..), NamePart(..), nameRange, projectRoot, toTopLevelModuleName)
 import qualified Agda.Syntax.Concrete.Name
   as N
 import Agda.Syntax.Parser
@@ -85,9 +86,9 @@ import Control.Monad.Except
 import Control.Monad.IO.Class
   (MonadIO, liftIO)
 import Control.Monad.Reader
-  (MonadReader, ReaderT, runReaderT)
+  (MonadReader, runReaderT)
 import Control.Monad.State
-  (MonadState, StateT, runStateT)
+  (MonadState, runStateT)
 import Data.Bool
   (bool)
 import Data.Foldable
@@ -1718,10 +1719,21 @@ checkModule
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => Module
+  => Maybe QName
+  -> Module
   -> m Context
-checkModule (_, ds)
-  = toContext <$> checkDeclarationsTop mempty ds
+checkModule n (_, ds) = do
+  local
+    <- askLocal
+  _
+    <- traverse_ modifyBlock n
+  context
+    <- toContext <$> checkDeclarationsTop mempty ds
+  _
+    <- traverse_ (flip modifyCheck context) n
+  _
+    <- when local (touchContext context)
+  pure context
 
 -- ## Files
 
@@ -1768,7 +1780,7 @@ checkFileWith'
 checkFileWith' r n Nothing
   = checkFileExternal r n
 checkFileWith' _ n (Just p)
-  = checkFilePath (Just n) p
+  = checkFilePath n p
 
 checkFileExternal
   :: MonadError Error m
@@ -1789,25 +1801,58 @@ checkFileExternal r n = do
     <- liftEither (mapLeft (ErrorFind r n) pathEither)
   _
     <- modifySources sources'
-  localSkip (checkFilePath (Just n) (filePath (srcFilePath path)))
+  context
+    <- localSkip (checkFilePath n (filePath (srcFilePath path)))
+  pure context
 
 checkFilePath
   :: MonadError Error m
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => Maybe QName
+  => QName
   -> FilePath
   -> m Context
-checkFilePath n p = do
+checkFilePath n p
+  = readModule p
+  >>= checkModule (Just n)
+
+checkFileTop
+  :: MonadError Error m
+  => MonadIO m
+  => Mode
+  -> UnusedOptions
+  -> FilePath
+  -- ^ The file to check.
+  -> m (FilePath, State)
+  -- ^ The project root, along with the final state.
+checkFileTop m opts p = do
+  module'
+    <- readModule p
+  absolutePath
+    <- pure (projectRoot (mkAbsolute p) (topLevelModuleName module'))
+  rootPath
+    <- pure (filePath absolutePath)
+  includesEither
+    <- liftIO (runTCMTop (setOptions opts >> getIncludeDirs))
+  includes
+    <- liftEither (mapLeft (const ErrorInclude) includesEither)
+  env
+    <- pure (Environment m rootPath includes)
+  (_, state)
+    <- runStateT (runReaderT (checkModule Nothing module') env) stateEmpty
+  pure (rootPath, state)
+
+readModule
+  :: MonadError Error m
+  => MonadIO m
+  => FilePath
+  -> m Module
+readModule p = do
   exists
     <- liftIO (doesFileExist p)
   _
     <- unless exists (throwError (ErrorFile p))
-  local
-    <- askLocal
-  _
-    <- traverse_ modifyBlock n
   absolutePath
     <- pure (mkAbsolute p)
   contents
@@ -1816,13 +1861,7 @@ checkFilePath n p = do
     <- liftIO (runPMIO (parseFile moduleParser absolutePath contents))
   (module', _)
     <- liftEither (mapLeft ErrorParse parseResult)
-  context
-    <- checkModule module'
-  _
-    <- traverse_ (flip modifyCheck context) n
-  _
-    <- when local (touchContext context)
-  pure context
+  pure module'
 
 -- ## Paths
 
@@ -1911,9 +1950,8 @@ checkUnusedWith
   -> IO (Either Error UnusedItems)
 checkUnusedWith m opts
   = runExceptT
-  . fmap (UnusedItems . stateItems)
-  . runUnusedT m opts
-  . checkFilePath Nothing
+  . fmap (UnusedItems . stateItems . snd)
+  . checkFileTop m opts
 
 -- | Check an Agda file and its dependencies for unused code, including public
 -- items in dependencies, as well as files.
@@ -1935,33 +1973,15 @@ checkUnusedGlobal'
   -> FilePath
   -> ExceptT Error m Unused
 checkUnusedGlobal' opts p = do
-  state
-    <- runUnusedT GlobalMain opts (checkFilePath Nothing p)
+  (rootPath, state)
+    <- checkFileTop GlobalMain opts p
   files
-    <- checkPath (stateModules state) p (unusedOptionsRoot opts)
+    <- checkPath (stateModules state) p rootPath
   items 
     <- pure (UnusedItems (filter (not . inFile p) (stateItems state)))
   unused
     <- pure (Unused files items)
   pure unused
-
-runUnusedT
-  :: MonadError Error m
-  => MonadIO m
-  => Mode
-  -> UnusedOptions
-  -> ReaderT Environment (StateT State m) a
-  -> m State
-runUnusedT m opts x = do
-  rootPath
-    <- pure (unusedOptionsRoot opts)
-  includesEither
-    <- liftIO (runTCMTop (setOptions opts >> getIncludeDirs))
-  includes
-    <- liftEither (mapLeft (const ErrorInclude) includesEither)
-  (_, state)
-    <- runStateT (runReaderT x (Environment m rootPath includes)) stateEmpty
-  pure state
 
 setOptions
   :: UnusedOptions

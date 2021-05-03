@@ -37,9 +37,7 @@ newtype UnusedItems
 -- | Options required by check functions.
 data UnusedOptions
   = UnusedOptions
-  { unusedOptionsRoot
-    :: FilePath
-  , unusedOptionsInclude
+  { unusedOptionsInclude
     :: [FilePath]
   , unusedOptionsLibraries
     :: [Text]

@@ -1562,12 +1562,12 @@ checkImportDirective
   -> ImportDirective
   -> m Context
 checkImportDirective dt r n c (ImportDirective _ UseEverything hs rs _)
-  = traverse_ (\t -> modifyInsert r (RangeNamed t n)) (directiveStatement dt)
+  = traverse (\t -> modifyInsert r (RangeNamed t n)) (directiveStatement dt)
   >> modifyHidings c (hs <> (renFrom <$> rs))
   >>= \c' -> checkRenamings dt c rs
   >>= \c'' -> contextInsertRangeAll r (c' <> c'')
 checkImportDirective dt r n c (ImportDirective _ (Using ns) _ rs _)
-  = traverse_ (\t -> modifyInsert r (RangeNamed t n)) (directiveStatement dt)
+  = traverse (\t -> modifyInsert r (RangeNamed t n)) (directiveStatement dt)
   >> checkImportedNames dt c ns
   >>= \c' -> checkRenamings dt c rs
   >>= \c'' -> contextInsertRangeAll r (c' <> c'')
@@ -1726,11 +1726,11 @@ checkModule n (_, ds) = do
   local
     <- askLocal
   _
-    <- traverse_ modifyBlock n
+    <- traverse modifyBlock n
   context
     <- toContext <$> checkDeclarationsTop mempty ds
   _
-    <- traverse_ (flip modifyCheck context) n
+    <- traverse (flip modifyCheck context) n
   _
     <- when local (touchContext context)
   pure context

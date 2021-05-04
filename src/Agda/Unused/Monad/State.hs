@@ -39,8 +39,6 @@ import Agda.Unused.Types.Name
   (QName)
 import Agda.Unused.Types.Range
   (Range, Range'(..), RangeInfo, rangeContains)
-import Agda.Unused.Utils
-  (mapDeletes)
 
 import Agda.TypeChecking.Monad.Base
   (ModuleToSource)
@@ -147,11 +145,11 @@ stateInsert r@(Range _ _) i (State rs ms ss)
   = State (Map.insert r i rs) ms ss
 
 stateDelete
-  :: [Range]
+  :: Set Range
   -> State
   -> State
 stateDelete rs (State rs' ms ss)
-  = State (mapDeletes rs rs') ms ss
+  = State (Map.withoutKeys rs' rs) ms ss
 
 stateModule
   :: QName
@@ -208,7 +206,7 @@ modifyInsert r i
 modifyDelete
   :: MonadReader Environment m
   => MonadState State m
-  => [Range]
+  => Set Range
   -> m ()
 modifyDelete rs
   = askSkip >>= flip unless (modify (stateDelete rs))

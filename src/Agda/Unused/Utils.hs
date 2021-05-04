@@ -17,20 +17,12 @@ module Agda.Unused.Utils
 
   , stripSuffix
 
-    -- * Map
-
-  , mapDeletes
-
   ) where
 
 import Control.Monad.Except
   (MonadError, throwError)
 import Data.List
   (stripPrefix)
-import Data.Map.Strict
-  (Map)
-import qualified Data.Map.Strict
-  as Map
 
 -- ## Maybe
 
@@ -67,15 +59,4 @@ stripSuffix
   -> Maybe [a]
 stripSuffix xs ys
   = reverse <$> stripPrefix (reverse xs) (reverse ys)
-
--- ## Map
-
--- | Delete a list of keys from a map.
-mapDeletes
-  :: Ord k
-  => [k]
-  -> Map k a
-  -> Map k a
-mapDeletes ks xs
-  = foldr Map.delete xs ks
 

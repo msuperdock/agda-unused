@@ -84,6 +84,10 @@ import qualified Data.Map.Strict
   as Map
 import Data.Maybe
   (catMaybes)
+import Data.Set
+  (Set)
+import qualified Data.Set
+  as Set
 
 -- ## Definitions
 
@@ -96,17 +100,17 @@ import Data.Maybe
 data Item where
 
   ItemConstructor
-    :: ![Range]
-    -> ![Name]
+    :: !(Set Range)
+    -> !(Set Name)
     -> Item
 
   ItemPattern
-    :: ![Range]
+    :: !(Set Range)
     -> !(Maybe Name)
     -> Item
 
   Item
-    :: ![Range]
+    :: !(Set Range)
     -> !(Maybe Name)
     -> Item
 
@@ -146,32 +150,32 @@ data Special where
 data AccessItem where
 
   AccessItemConstructor
-    :: ![Range]
+    :: !(Set Range)
     -- ^ Private ranges.
-    -> ![Range]
+    -> !(Set Range)
     -- ^ Public ranges.
-    -> ![Name]
+    -> !(Set Name)
     -- ^ Private syntax.
-    -> ![Name]
+    -> !(Set Name)
     -- ^ Public syntax.
     -> AccessItem
 
   AccessItemPattern
     :: !Access
-    -> ![Range]
+    -> !(Set Range)
     -> !(Maybe Name)
     -> AccessItem
 
   AccessItemSyntax
     :: !Defining
     -> !Special
-    -> ![Range]
+    -> !(Set Range)
     -> AccessItem
 
   AccessItem
     :: !Defining
     -> !Access
-    -> ![Range]
+    -> !(Set Range)
     -> !(Maybe Name)
     -> AccessItem
 
@@ -185,7 +189,7 @@ data AccessItem where
 data Module
   = Module
   { moduleRanges'
-    :: ![Range]
+    :: !(Set Range)
   , moduleContext
     :: !Context
   } deriving Show
@@ -196,7 +200,7 @@ data AccessModule
   { accessModuleAccess
     :: !Access
   , accessModuleRanges
-    :: ![Range]
+    :: !(Set Range)
   , accessModuleContext
     :: !Context
   } deriving Show
@@ -253,7 +257,8 @@ accessItemUnion
   :: AccessItem
   -> AccessItem
   -> AccessItem
-accessItemUnion i@(AccessItem _ Public _ _) (AccessItemConstructor _ [] _ _)
+accessItemUnion i@(AccessItem _ Public _ _) (AccessItemConstructor _ rs _ _)
+  | Set.null rs
   = i
 accessItemUnion i@(AccessItem _ Public _ _) (AccessItem _ Private _ _)
   = i
@@ -324,7 +329,7 @@ data LookupError where
 contextLookup
   :: QName
   -> Context
-  -> Maybe [Range]
+  -> Maybe (Set Range)
 contextLookup n c
   = itemRanges <$> contextLookupItem n c
 
@@ -352,7 +357,7 @@ contextLookupItem (Qual n ns) (Context _ ms)
 accessContextLookup
   :: QName
   -> AccessContext
-  -> Either LookupError [Range]
+  -> Either LookupError (Set Range)
 accessContextLookup n c@(AccessContext _ _ is)
   = contextLookup n (toContext' c)
   <|> Map.mapWithKey (accessContextLookupImport n) is
@@ -370,7 +375,7 @@ accessContextLookupImport
   :: QName
   -> QName
   -> Context
-  -> Maybe [Range]
+  -> Maybe (Set Range)
 accessContextLookupImport n i c
   = stripPrefix i n >>= flip contextLookup c
 
@@ -380,7 +385,7 @@ accessContextLookupModuleImport
   -> Context
   -> Maybe Module
 accessContextLookupModuleImport n i c | n == i
-  = Just (Module [] c)
+  = Just (Module mempty c)
 accessContextLookupModuleImport n i c
   = stripPrefix i n >>= flip contextLookupModule c
 
@@ -416,7 +421,7 @@ accessItemDefining _
 accessContextLookupDefining
   :: QName
   -> AccessContext
-  -> Either LookupError (Bool, [Range])
+  -> Either LookupError (Bool, Set Range)
 accessContextLookupDefining (QName n) (AccessContext is _ _)
   = maybe
     (Left LookupNotFound)
@@ -451,38 +456,38 @@ itemInsertRange
   -> Item
   -> Item
 itemInsertRange r (ItemConstructor rs ss)
-  = ItemConstructor (r : rs) ss
+  = ItemConstructor (Set.insert r rs) ss
 itemInsertRange r (ItemPattern rs s)
-  = ItemPattern (r : rs) s
+  = ItemPattern (Set.insert r rs) s
 itemInsertRange r (Item rs s)
-  = Item (r : rs) s
+  = Item (Set.insert r rs) s
 
 accessItemInsertRange
   :: Range
   -> AccessItem
   -> AccessItem
 accessItemInsertRange r (AccessItemConstructor rs1 rs2 ss1 ss2)
-  = AccessItemConstructor (r : rs1) (r : rs2) ss1 ss2
+  = AccessItemConstructor (Set.insert r rs1) (Set.insert r rs2) ss1 ss2
 accessItemInsertRange r (AccessItemPattern a rs s)
-  = AccessItemPattern a (r : rs) s
+  = AccessItemPattern a (Set.insert r rs) s
 accessItemInsertRange r (AccessItemSyntax d s rs)
-  = AccessItemSyntax d s (r : rs)
+  = AccessItemSyntax d s (Set.insert r rs)
 accessItemInsertRange r (AccessItem i a rs s)
-  = AccessItem i a (r : rs) s
+  = AccessItem i a (Set.insert r rs) s
 
 moduleInsertRangeAll
   :: Range
   -> Module
   -> Module
 moduleInsertRangeAll r (Module rs c)
-  = Module (r : rs) (contextInsertRangeAll r c)
+  = Module (Set.insert r rs) (contextInsertRangeAll r c)
 
 accessModuleInsertRangeAll
   :: Range
   -> AccessModule
   -> AccessModule
 accessModuleInsertRangeAll r (AccessModule a rs c)
-  = AccessModule a (r : rs) (contextInsertRangeAll r c)
+  = AccessModule a (Set.insert r rs) (contextInsertRangeAll r c)
 
 -- | Insert a range for all names in a context.
 contextInsertRangeAll
@@ -563,7 +568,7 @@ accessContextDefineFields (AccessContext is ms js)
 
 itemRanges
   :: Item
-  -> [Range]
+  -> Set Range
 itemRanges (ItemConstructor rs _)
   = rs
 itemRanges (ItemPattern rs _)
@@ -573,7 +578,7 @@ itemRanges (Item rs _)
 
 accessItemRanges
   :: AccessItem
-  -> [Range]
+  -> Set Range
 accessItemRanges
   = itemRanges . toItem'
 
@@ -581,25 +586,25 @@ accessItemRanges
 -- associated with the module itself.
 moduleRanges
   :: Module
-  -> [Range]
+  -> Set Range
 moduleRanges (Module rs c)
   = rs <> contextRanges c
 
 -- | Get all ranges associated with names in the given context.
 contextRanges
   :: Context
-  -> [Range]
+  -> Set Range
 contextRanges (Context is ms)
-  = concat (itemRanges <$> Map.elems is)
-  <> concat (moduleRanges <$> Map.elems ms)
+  = mconcat (itemRanges <$> Map.elems is)
+  <> mconcat (moduleRanges <$> Map.elems ms)
 
 -- | Get all ranges associated with names in the given access context.
 accessContextRanges
   :: AccessContext
-  -> [Range]
+  -> Set Range
 accessContextRanges c@(AccessContext _ _ js)
   = contextRanges (toContext' c)
-  <> concat (contextRanges <$> Map.elems js)
+  <> mconcat (contextRanges <$> Map.elems js)
 
 -- ### Match
 
@@ -633,17 +638,17 @@ contextModule n m
 accessContextConstructor
   :: Name
   -> Access
-  -> [Range]
+  -> Set Range
   -> Maybe Name
   -> AccessContext
 accessContextConstructor n a rs s
-  = accessContextItem' n a (ItemConstructor rs (maybe [] (: []) s))
+  = accessContextItem' n a (ItemConstructor rs (maybe mempty Set.singleton s))
 
 -- | Construct an 'AccessContext' with a single pattern synonym.
 accessContextPattern
   :: Name
   -> Access
-  -> [Range]
+  -> Set Range
   -> Maybe Name
   -> AccessContext
 accessContextPattern n a rs s
@@ -653,7 +658,7 @@ accessContextPattern n a rs s
 accessContextField
   :: Name
   -> Access
-  -> [Range]
+  -> Set Range
   -> Maybe Name
   -> AccessContext
 accessContextField n a rs s
@@ -663,7 +668,7 @@ accessContextField n a rs s
 accessContextItem
   :: Name
   -> Access
-  -> [Range]
+  -> Set Range
   -> Maybe Name
   -> AccessContext
 accessContextItem n a rs s
@@ -697,7 +702,7 @@ accessContextModule n m
 accessContextModule'
   :: Name
   -> Access
-  -> [Range]
+  -> Set Range
   -> AccessContext
   -> AccessContext
 accessContextModule' n a rs c
@@ -718,9 +723,9 @@ fromItem
   -> Item
   -> AccessItem
 fromItem Private (ItemConstructor rs ss)
-  = AccessItemConstructor rs [] ss []
+  = AccessItemConstructor rs mempty ss mempty
 fromItem Public (ItemConstructor rs ss)
-  = AccessItemConstructor [] rs [] ss
+  = AccessItemConstructor mempty rs mempty ss
 fromItem a (ItemPattern rs s)
   = AccessItemPattern a rs s
 fromItem a (Item rs s)
@@ -730,7 +735,7 @@ fromItemSyntax
   :: Item
   -> [(Name, AccessItem)]
 fromItemSyntax (ItemConstructor rs ss)
-  = flip (,) (AccessItemSyntax NotDefining Special rs) <$> ss
+  = flip (,) (AccessItemSyntax NotDefining Special rs) <$> Set.elems ss
 fromItemSyntax (ItemPattern rs s)
   = flip (,) (AccessItemSyntax NotDefining Special rs) <$> maybe [] (: []) s
 fromItemSyntax (Item rs s)
@@ -739,7 +744,7 @@ fromItemSyntax (Item rs s)
 toItem
   :: AccessItem
   -> Maybe Item
-toItem (AccessItemConstructor _ rs@(_ : _) _ ss)
+toItem (AccessItemConstructor _ rs _ ss) | not (Set.null rs)
   = Just (ItemConstructor rs ss)
 toItem (AccessItemPattern Public rs s)
   = Just (ItemPattern rs s)

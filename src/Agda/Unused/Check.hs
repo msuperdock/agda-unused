@@ -227,7 +227,8 @@ checkName _ _ _ _ _ (Name [Hole])
   = pure mempty
 checkName p fs a t r@(Range _ _) n
   = modifyInsert r (RangeNamed t (QName n))
-  >> pure (bool accessContextItem accessContextPattern p n a [r] (syntax fs n))
+  >> pure (bool accessContextItem accessContextPattern p n a (Set.singleton r)
+    (syntax fs n))
 
 checkName'
   :: MonadReader Environment m
@@ -315,7 +316,7 @@ checkModuleName
 checkModuleName c a r n
   = modifyInsert r (RangeNamed RangeModule (QName n))
   >> contextInsertRangeAll r c
-  >>= \c' -> pure (accessContextModule n (AccessModule a [r] c'))
+  >>= \c' -> pure (accessContextModule n (AccessModule a (Set.singleton r) c'))
 
 checkModuleNameMay
   :: MonadReader Environment m
@@ -343,7 +344,7 @@ touchName c n
 touchNameWith
   :: MonadReader Environment m
   => MonadState State m
-  => Either LookupError (Bool, [Range])
+  => Either LookupError (Bool, Set Range)
   -> Bool
   -> m ()
 touchNameWith (Right (False, rs)) False
@@ -377,7 +378,7 @@ touchQNameWith
   => MonadState State m
   => Range
   -> QName
-  -> Either LookupError (Bool, [Range])
+  -> Either LookupError (Bool, Set Range)
   -> Bool
   -> m ()
 touchQNameWith r n (Left LookupAmbiguous) False
@@ -1068,7 +1069,7 @@ checkDeclarationsRecord
   => MonadState State m
   => MonadIO m
   => Name
-  -> [Range]
+  -> Set Range
   -- ^ Ranges associated with parent record.
   -> AccessContext
   -> [Declaration]
@@ -1282,7 +1283,7 @@ checkNiceDeclarationRecord
   => MonadState State m
   => MonadIO m
   => Name
-  -> [Range]
+  -> Set Range
   -- ^ Ranges associated with parent record.
   -> Fixities
   -> AccessContext
@@ -1352,7 +1353,7 @@ checkNiceDeclarationsRecord
   => MonadState State m
   => MonadIO m
   => Name
-  -> [Range]
+  -> Set Range
   -- ^ Ranges associated with parent record.
   -> Fixities
   -> AccessContext
@@ -1411,7 +1412,7 @@ checkNiceDataDef
   -> m AccessContext
 checkNiceDataDef b fs c n bs cs
   = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromName n)
-  >>= \n' -> pure (either (const []) id (accessContextLookup (QName n') c))
+  >>= \n' -> pure (either mempty id (accessContextLookup (QName n') c))
   >>= \rs -> checkLamBindings b c bs
   >>= \c' -> checkNiceConstructors fs rs (accessContextDefine n' c <> c') cs
   >>= \c'' -> pure (accessContextModule' n' Public rs c'' <> c'')
@@ -1432,7 +1433,7 @@ checkNiceRecordDef
   -> m AccessContext
 checkNiceRecordDef b fs c n m bs ds
   = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromName n)
-  >>= \n' -> pure (either (const []) id (accessContextLookup (QName n') c))
+  >>= \n' -> pure (either (const mempty) id (accessContextLookup (QName n') c))
   >>= \rs -> checkLamBindings b c bs
   >>= \c' -> checkNiceConstructorRecordMay fs rs (m >>= fromNameRange . fst)
   >>= \c'' -> checkDeclarationsRecord n' rs (c <> c') ds
@@ -1444,7 +1445,7 @@ checkNiceConstructor
   => MonadState State m
   => MonadIO m
   => Fixities
-  -> [Range]
+  -> Set Range
   -- ^ Ranges associated with parent type.
   -> AccessContext
   -> NiceConstructor
@@ -1465,7 +1466,7 @@ checkNiceConstructors
   => MonadState State m
   => MonadIO m
   => Fixities
-  -> [Range]
+  -> Set Range
   -- ^ Ranges associated with parent type.
   -> AccessContext
   -> [NiceDeclaration]
@@ -1477,20 +1478,20 @@ checkNiceConstructorRecord
   :: MonadReader Environment m
   => MonadState State m
   => Fixities
-  -> [Range]
+  -> Set Range
   -- ^ Ranges associated with record type.
   -> Range
   -> Name
   -> m AccessContext
 checkNiceConstructorRecord fs rs r n
   = modifyInsert r (RangeNamed RangeRecordConstructor (QName n))
-  >> pure (accessContextConstructor n Public (r : rs) (syntax fs n))
+  >> pure (accessContextConstructor n Public (Set.insert r rs) (syntax fs n))
 
 checkNiceConstructorRecordMay
   :: MonadReader Environment m
   => MonadState State m
   => Fixities
-  -> [Range]
+  -> Set Range
   -- ^ Ranges associated with record type.
   -> Maybe (Range, Name)
   -> m AccessContext

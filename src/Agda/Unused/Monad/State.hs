@@ -54,6 +54,8 @@ import Data.Map.Strict
   (Map)
 import qualified Data.Map.Strict
   as Map
+import Data.Set
+  (Set)
 
 -- ## Definitions
 
@@ -122,9 +124,9 @@ stateItemsFilter (i : is)
 -- | Get a list of visited modules.
 stateModules
   :: State
-  -> [QName]
+  -> Set QName
 stateModules
-  = Map.keys
+  = Map.keysSet
   . stateModules'
 
 stateSources

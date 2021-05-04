@@ -93,12 +93,14 @@ import Data.Bool
   (bool)
 import Data.Foldable
   (traverse_)
-import Data.List
-  (sort)
 import qualified Data.Map.Strict
   as Map
 import Data.Maybe
   (catMaybes)
+import Data.Set
+  (Set)
+import qualified Data.Set
+  as Set
 import qualified Data.Text
   as T
 import System.Directory
@@ -1871,7 +1873,7 @@ readModule p = do
 
 -- Look for unvisited modules.
 checkPath
-  :: [QName]
+  :: Set QName
   -- ^ Visited modules.
   -> FilePath
   -- ^ A path to ignore.
@@ -1879,11 +1881,11 @@ checkPath
   -- ^ The project root path.
   -> IO [FilePath]
 checkPath ns i r
-  = sort <$> checkPath' ns i r r
+  = Set.toAscList <$> checkPath' ns i r r
 
 -- Look for unvisited modules at the given path.
 checkPath'
-  :: [QName]
+  :: Set QName
   -- ^ Visited modules.
   -> FilePath
   -- ^ A path to ignore.
@@ -1891,13 +1893,13 @@ checkPath'
   -- ^ The project root path.
   -> FilePath
   -- ^ The path at which to look.
-  -> IO [FilePath]
+  -> IO (Set FilePath)
 checkPath' ns i r p
   = liftIO (doesDirectoryExist p)
   >>= bool (pure (checkPathFile ns i r p)) (checkPathDirectory ns i r p)
 
 checkPathFile
-  :: [QName]
+  :: Set QName
   -- ^ Visited modules.
   -> FilePath
   -- ^ A path to ignore.
@@ -1905,14 +1907,15 @@ checkPathFile
   -- ^ The project root path.
   -> FilePath
   -- ^ The path at which to look.
-  -> [FilePath]
+  -> Set FilePath
 checkPathFile _ i _ p | i == p
-  = []
+  = mempty
 checkPathFile ns _ r p
-  = maybe [] (bool [p] [] . flip elem ns) (pathQName r p)
+  = maybe mempty (bool (Set.singleton p) mempty . flip Set.member ns)
+  $ pathQName r p
 
 checkPathDirectory
-  :: [QName]
+  :: Set QName
   -- ^ Visited modules.
   -> FilePath
   -- ^ A path to ignore.
@@ -1920,11 +1923,11 @@ checkPathDirectory
   -- ^ The project root path.
   -> FilePath
   -- ^ The path at which to look.
-  -> IO [FilePath]
+  -> IO (Set FilePath)
 checkPathDirectory ns i r p
   = fmap (p </>) <$> liftIO (listDirectory p)
   >>= traverse (checkPath' ns i r)
-  >>= pure . concat
+  >>= pure . Set.unions
 
 -- ## Main
 

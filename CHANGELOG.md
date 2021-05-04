@@ -1,16 +1,19 @@
 # Changelog
 
-## 0.1.0 (Oct. 2020)
+## 0.1.0 (Oct 2020)
 
 Initial release.
 
-## 0.2.0
+## 0.2.0 (May 2021)
 
-- Support all Agda library-related options (`--include-path`, etc.).
+- Support code depending on external libraries.
+- Support Agda's library-related options (`--include-path`, etc.).
 - Remove support for `.agda-roots` file; use an ordinary Agda file instead.
 - Replace the `--local` option with a `--global` flag; default to a local check.
+- Remove the `--root` option; infer the project root directory automatically.
 - The `agda-unused` command now takes a filename as a positional argument.
-- Use `.agda-lib` file to infer the root directory if not given.
 - Check variables in standalone data & record definitions.
 - Check renaming directives simultaneously (fixes bug).
+- Check record types with fields referencing other fields (fixes bug).
+- Check import statements with `as _` (fixes bug).
 

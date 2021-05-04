@@ -164,6 +164,9 @@ printInternalError (ErrorConstructor r)
 printInternalError (ErrorMacro r)
   = printMessage (printRange r)
   $ "Internal error: Invalid module application."
+printInternalError (ErrorModuleName n)
+  = printMessage (T.pack n)
+  $ "Internal error: Empty top-level module name."
 printInternalError (ErrorName r)
   = printMessage (printRange r)
   $ "Internal error: Invalid name."

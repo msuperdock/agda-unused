@@ -36,8 +36,8 @@ import Agda.Unused.Types.Context
 import qualified Agda.Unused.Types.Context
   as C
 import Agda.Unused.Types.Name
-  (Name(..), QName(..), fromAsName, fromName, fromNameRange, fromQName,
-    fromQNameRange, nameIds, pathQName, qNamePath, toQName)
+  (Name(..), QName(..), fromAsName, fromModuleName, fromName, fromNameRange,
+    fromQName, fromQNameRange, nameIds, pathQName, qNamePath, toQName)
 import Agda.Unused.Types.Range
   (Range'(..), RangeInfo(..), RangeType(..), rangePath)
 import Agda.Unused.Utils
@@ -1719,18 +1719,18 @@ checkModule
   => MonadReader Environment m
   => MonadState State m
   => MonadIO m
-  => Maybe QName
+  => QName
   -> Module
   -> m Context
 checkModule n (_, ds) = do
   local
     <- askLocal
   _
-    <- traverse modifyBlock n
+    <- modifyBlock n
   context
     <- toContext <$> checkDeclarationsTop mempty ds
   _
-    <- traverse (flip modifyCheck context) n
+    <- modifyCheck n context
   _
     <- when local (touchContext context)
   pure context
@@ -1815,7 +1815,7 @@ checkFilePath
   -> m Context
 checkFilePath n p
   = readModule p
-  >>= checkModule (Just n)
+  >>= checkModule n
 
 checkFileTop
   :: MonadError Error m
@@ -1829,8 +1829,12 @@ checkFileTop
 checkFileTop m opts p = do
   module'
     <- readModule p
+  moduleName
+    <- pure (topLevelModuleName module')
+  moduleQName
+    <- liftMaybe (ErrorInternal (ErrorModuleName p)) (fromModuleName moduleName)
   absolutePath
-    <- pure (projectRoot (mkAbsolute p) (topLevelModuleName module'))
+    <- pure (projectRoot (mkAbsolute p) moduleName)
   rootPath
     <- pure (filePath absolutePath)
   includesEither
@@ -1840,7 +1844,7 @@ checkFileTop m opts p = do
   env
     <- pure (Environment m rootPath includes)
   (_, state)
-    <- runStateT (runReaderT (checkModule Nothing module') env) stateEmpty
+    <- runStateT (runReaderT (checkModule moduleQName module') env) stateEmpty
   pure (rootPath, state)
 
 readModule

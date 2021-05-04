@@ -23,6 +23,7 @@ module Agda.Unused.Types.Name
   , fromQName
   , fromQNameRange
   , fromAsName
+  , fromModuleName
 
   , toName
   , toQName
@@ -44,7 +45,7 @@ import Agda.Unused.Utils
 import Agda.Syntax.Concrete
   (AsName, AsName'(..))
 import Agda.Syntax.Concrete.Name
-  (NameInScope(..), NamePart(..))
+  (NameInScope(..), NamePart(..), TopLevelModuleName(..))
 import qualified Agda.Syntax.Concrete.Name
   as N
 import Agda.Syntax.Position
@@ -168,6 +169,30 @@ fromAsName (AsName (Left _) _)
   = Nothing
 fromAsName (AsName (Right n) _)
   = fromName n
+
+-- | Conversion from Agda top level module name type.
+fromModuleName
+  :: TopLevelModuleName
+  -> Maybe QName
+fromModuleName (TopLevelModuleName _ [])
+  = Nothing
+fromModuleName (TopLevelModuleName _ (n : ns))
+  = Just (fromStrings n ns)
+
+fromStrings
+  :: String
+  -> [String]
+  -> QName
+fromStrings n []
+  = QName (fromString n)
+fromStrings n (n' : ns)
+  = Qual (fromString n) (fromStrings n' ns)
+
+fromString
+  :: String
+  -> Name
+fromString n
+  = Name [Id n]
 
 -- | Conversion to Agda name type.
 toName

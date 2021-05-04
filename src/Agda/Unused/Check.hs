@@ -1867,21 +1867,19 @@ readModule p = do
 
 -- Look for unvisited modules.
 checkPath
-  :: MonadIO m
-  => [QName]
+  :: [QName]
   -- ^ Visited modules.
   -> FilePath
   -- ^ A path to ignore.
   -> FilePath
   -- ^ The project root path.
-  -> m [FilePath]
+  -> IO [FilePath]
 checkPath ns i r
   = sort <$> checkPath' ns i r r
 
 -- Look for unvisited modules at the given path.
 checkPath'
-  :: MonadIO m
-  => [QName]
+  :: [QName]
   -- ^ Visited modules.
   -> FilePath
   -- ^ A path to ignore.
@@ -1889,7 +1887,7 @@ checkPath'
   -- ^ The project root path.
   -> FilePath
   -- ^ The path at which to look.
-  -> m [FilePath]
+  -> IO [FilePath]
 checkPath' ns i r p
   = liftIO (doesDirectoryExist p)
   >>= bool (pure (checkPathFile ns i r p)) (checkPathDirectory ns i r p)
@@ -1910,8 +1908,7 @@ checkPathFile ns _ r p
   = maybe [] (bool [p] [] . flip elem ns) (pathQName r p)
 
 checkPathDirectory
-  :: MonadIO m
-  => [QName]
+  :: [QName]
   -- ^ Visited modules.
   -> FilePath
   -- ^ A path to ignore.
@@ -1919,7 +1916,7 @@ checkPathDirectory
   -- ^ The project root path.
   -> FilePath
   -- ^ The path at which to look.
-  -> m [FilePath]
+  -> IO [FilePath]
 checkPathDirectory ns i r p
   = fmap (p </>) <$> liftIO (listDirectory p)
   >>= traverse (checkPath' ns i r)
@@ -1968,15 +1965,14 @@ checkUnusedGlobal opts p
   = runExceptT (checkUnusedGlobal' opts p)
 
 checkUnusedGlobal'
-  :: MonadIO m
-  => UnusedOptions
+  :: UnusedOptions
   -> FilePath
-  -> ExceptT Error m Unused
+  -> ExceptT Error IO Unused
 checkUnusedGlobal' opts p = do
   (rootPath, state)
     <- checkFileTop GlobalMain opts p
   files
-    <- checkPath (stateModules state) p rootPath
+    <- liftIO (checkPath (stateModules state) p rootPath)
   items 
     <- pure (UnusedItems (filter (not . inFile p) (stateItems state)))
   unused

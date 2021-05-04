@@ -32,11 +32,9 @@ import Options.Applicative
     hidden, info, long, many, metavar, optional, progDesc, short, strArgument,
     strOption, switch)
 import System.Directory
-  (doesDirectoryExist, doesFileExist, listDirectory, makeAbsolute)
+  (doesDirectoryExist, doesFileExist, makeAbsolute)
 import System.Exit
   (exitFailure, exitSuccess)
-import System.FilePath
-  (isExtensionOf, takeDirectory)
 import System.IO
   (stderr)
 
@@ -70,14 +68,34 @@ data Options
     -- ^ Whether to not use default libraries.
   } deriving Show
 
+-- Convert options; print error message & exit on failure.
 optionsUnused
   :: Options
   -> IO (FilePath, UnusedOptions)
-optionsUnused opts = do
+optionsUnused opts
+  = runExceptT (optionsUnused' opts)
+  >>= optionsUnusedEither
+
+optionsUnusedEither
+  :: Either OptionsError (FilePath, UnusedOptions)
+  -> IO (FilePath, UnusedOptions)
+optionsUnusedEither (Left e)
+  = I.hPutStrLn stderr (printOptionsError e) >> exitFailure
+optionsUnusedEither (Right opts)
+  = pure opts
+
+optionsUnused'
+  :: MonadError OptionsError m
+  => MonadIO m
+  => Options
+  -> m (FilePath, UnusedOptions)
+optionsUnused' opts = do
   filePath
-    <- makeAbsolute (optionsFile opts)
+    <- validateFile (optionsFile opts)
   includePaths
-    <- traverse makeAbsolute (optionsInclude opts)
+    <- traverse validateDirectory (optionsInclude opts)
+  libraryPath
+    <- traverse validateFile (optionsLibrariesFile opts)
   pure
     $ (,) filePath
     $ UnusedOptions
@@ -86,7 +104,7 @@ optionsUnused opts = do
     , unusedOptionsLibraries
       = optionsLibraries opts
     , unusedOptionsLibrariesFile
-      = optionsLibrariesFile opts
+      = libraryPath
     , unusedOptionsUseLibraries
       = not (optionsNoLibraries opts)
     , unusedOptionsUseDefaultLibraries
@@ -177,56 +195,29 @@ validateFile
   :: MonadError OptionsError m
   => MonadIO m
   => FilePath
-  -> m ()
+  -> m FilePath
 validateFile p = do
   exists
     <- liftIO (doesFileExist p)
   _
     <- unless exists (throwError (ErrorFile p))
-  pure ()
+  filePath
+    <- liftIO (makeAbsolute p)
+  pure filePath
 
 validateDirectory
   :: MonadError OptionsError m
   => MonadIO m
   => FilePath
-  -> m ()
+  -> m FilePath
 validateDirectory p = do
   exists
     <- liftIO (doesDirectoryExist p)
   _
     <- unless exists (throwError (ErrorDirectory p))
-  pure ()
-
-validateOptions
-  :: MonadError OptionsError m
-  => MonadIO m
-  => Options
-  -> m ()
-validateOptions opts = do
-  _
-    <- validateFile (optionsFile opts)
-  _
-    <- traverse validateFile (optionsInclude opts)
-  _
-    <- traverse validateFile (optionsLibrariesFile opts)
-  pure ()
-
-
--- Validate options; print error message & exit on failure.
-validateOptions'
-  :: Options
-  -> IO ()
-validateOptions' opts
-  = runExceptT (validateOptions opts)
-  >>= validateOptionsEither
-
-validateOptionsEither
-  :: Either OptionsError ()
-  -> IO ()
-validateOptionsEither (Left e)
-  = I.hPutStrLn stderr (printOptionsError e) >> exitFailure
-validateOptionsEither (Right _)
-  = pure ()
+  filePath
+    <- liftIO (makeAbsolute p)
+  pure filePath
 
 -- ## Check
 
@@ -234,8 +225,6 @@ check
   :: Options
   -> IO ()
 check opts = do
-  _
-    <- validateOptions' opts
   (filePath, opts')
     <- optionsUnused opts
   _
@@ -296,46 +285,6 @@ encodeMessage t m
   , "message"
     .= m
   ]
-
--- ## Root
-
-getRootDirectory
-  :: Maybe FilePath
-  -- ^ Path of the project root.
-  -> FilePath
-  -- ^ Absolute path of the file to check.
-  -> IO FilePath
-getRootDirectory Nothing p
-  = getRootDirectoryFrom (takeDirectory p) (takeDirectory p)
-getRootDirectory (Just r) _
-  = makeAbsolute r
-
--- Search recursively upwards for project root directory.
-getRootDirectoryFrom
-  :: FilePath
-  -- ^ Default directory.
-  -> FilePath
-  -- ^ Starting directory.
-  -> IO FilePath
-getRootDirectoryFrom d p
-  = listDirectory p
-  >>= pure . any (isExtensionOf "agda-lib")
-  >>= getRootDirectoryWith d p
-
-getRootDirectoryWith
-  :: FilePath
-  -- ^ Default directory.
-  -> FilePath
-  -- ^ Starting directory.
-  -> Bool
-  -- ^ Whether the starting directory contains an .agda-lib file.
-  -> IO FilePath
-getRootDirectoryWith _ p True
-  = pure p
-getRootDirectoryWith d p False | takeDirectory p == p
-  = pure d
-getRootDirectoryWith d p False
-  = getRootDirectoryFrom d (takeDirectory p)
 
 -- ## Main
 

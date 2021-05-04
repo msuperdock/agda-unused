@@ -1928,7 +1928,7 @@ checkPathDirectory
 checkPathDirectory ns i r p
   = fmap (p </>) <$> liftIO (listDirectory p)
   >>= traverse (checkPath' ns i r)
-  >>= pure . Set.unions
+  >>= pure . mconcat
 
 -- ## Main
 

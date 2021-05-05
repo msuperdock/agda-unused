@@ -132,8 +132,9 @@ identifiers are unused on the first run.
 
 We work with Agda's concrete syntax. This is a necessary choice, since Agda's
 abstract syntax doesn't distinguish between qualified and (opened) unqualified
-names, which makes it impossible to determine whether certain `open` statements
-are unused. However, this choice comes with several drawbacks:
+names, which would make it impossible to determine whether certain `open`
+statements are unused. However, using concrete syntax comes with several
+drawbacks:
 
 - We do not parse mixfix operators; if the parts of a mixfix operator are used
   in order in an expression, then we mark the mixfix operator as used.

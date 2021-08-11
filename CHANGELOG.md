@@ -17,3 +17,5 @@ Initial release.
 - Check record types with fields referencing other fields (fixes bug).
 - Check import statements with `as _` (fixes bug).
 
+## 0.3.0
+

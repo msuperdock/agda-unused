@@ -122,11 +122,10 @@ We make a single pass through the given Agda module and its dependencies:
 - When an existing item appears, we mark it used.
 
 This means, for example, if we have three definitions (say `f`, `g`, `h`), each
-depending on the previous one, where `h` is not a root, then `f` and `g` are
-considered used, while `h` is considered unused. If we remove `h` and run
-`agda-unsed` again, it will now report that `g` is unused. This behavior is
-different from Haskell's built-in tool, which would report that all three
-identifiers are unused on the first run.
+depending on the previous one, then `f` and `g` are considered used, while `h`
+is considered unused. If we remove `h` and run `agda-unused` again, it will now
+report that `g` is unused. This behavior is different from Haskell's built-in
+tool, which would report that all three identifiers are unused on the first run.
 
 ## Limitations
 

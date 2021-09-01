@@ -19,3 +19,5 @@ Initial release.
 
 ## 0.3.0
 
+- Support Agda 2.6.2; remove support for earlier versions.
+

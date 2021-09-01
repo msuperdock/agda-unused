@@ -17,7 +17,7 @@ flag, `agda-unused` treats the given file as a description of the public
 interface of the project, and additionally checks for unused files and unused
 public items in dependencies. (See below for more on the `--global` flag.)
 
-Supported Agda versions: `>= 2.6.1 && < 2.6.2`
+Supported Agda versions: `>= 2.6.2 && < 2.6.3`
 
 ## Example
 
@@ -142,8 +142,9 @@ drawbacks:
 
 Additionally, we currently do not support the following Agda features:
 
-- [record module instance applications](https://agda.readthedocs.io/en/v2.6.1.3/language/module-system.html#parameterised-modules)
-- [unquoting declarations](https://agda.readthedocs.io/en/v2.6.1.3/language/reflection.html#id3)
+- [record module instance applications](https://agda.readthedocs.io/en/v2.6.2/language/module-system.html#parameterised-modules)
+- [unquoting declarations](https://agda.readthedocs.io/en/v2.6.2/language/reflection.html#id3)
+- [lone constructors](https://agda.readthedocs.io/en/v2.6.2/language/mutual-recursion.html#interleaved-mutual-blocks)
 
 `agda-unused` will produce an error if your code uses these language features.
 

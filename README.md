@@ -15,7 +15,7 @@ unused code in that file and its dependencies. By default, `agda-unused` does
 not check public items that could be imported elsewhere. But with the `--global`
 flag, `agda-unused` treats the given file as a description of the public
 interface of the project, and additionally checks for unused files and unused
-public items in dependencies. (See below for more on the `--global` flag.)
+public items in dependencies. (See below for more on `--global`.)
 
 Supported Agda versions: `>= 2.6.2 && < 2.6.3`
 

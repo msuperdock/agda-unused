@@ -1,4 +1,4 @@
-module Definition where
+module TypeSig where
 
 f
   : {A : Set}

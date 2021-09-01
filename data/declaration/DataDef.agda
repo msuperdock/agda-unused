@@ -25,5 +25,5 @@ data D {z} _ where
 postulate
 
   d
-    : D tt
+    : D {tt} tt
 

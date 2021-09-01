@@ -47,7 +47,7 @@ library
     Agda.Unused.Utils
   build-depends:
     base >= 4.13 && < 4.15,
-    Agda >= 2.6.1 && < 2.6.2,
+    Agda >= 2.6.2 && < 2.6.3,
     containers >= 0.6.2 && < 0.7,
     directory >= 1.3.6 && < 1.4,
     filepath >= 1.4.2 && < 1.5,

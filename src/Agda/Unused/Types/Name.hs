@@ -54,8 +54,14 @@ import Data.List
   (isSubsequenceOf)
 import qualified Data.List
   as List
+import Data.List.NonEmpty
+  (NonEmpty(..))
+import qualified Data.List.NonEmpty
+  as NonEmpty
 import Data.Maybe
   (mapMaybe)
+import Data.Semigroup
+  (sconcat)
 import System.FilePath
   ((</>), (<.>), splitDirectories)
 
@@ -65,7 +71,7 @@ import System.FilePath
 newtype Name
   = Name
   { nameParts
-    :: [NamePart]
+    :: NonEmpty NamePart
   } deriving (Eq, Ord, Show)
 
 -- | A qualified name.
@@ -89,7 +95,7 @@ nameIds
   :: Name
   -> [String]
 nameIds (Name ps)
-  = mapMaybe namePartId ps
+  = mapMaybe namePartId (NonEmpty.toList ps)
 
 namePartId
   :: NamePart
@@ -102,11 +108,9 @@ namePartId (Id s)
 isOperator
   :: Name
   -> Bool
-isOperator (Name [])
+isOperator (Name (_ :| []))
   = False
-isOperator (Name (_ : []))
-  = False
-isOperator (Name (_ : _ : _))
+isOperator (Name (_ :| _ : _))
   = True
 
 -- | If the first module name is a prefix of the second module name, then strip
@@ -173,11 +177,9 @@ fromAsName (AsName (Right n) _)
 -- | Conversion from Agda top level module name type.
 fromModuleName
   :: TopLevelModuleName
-  -> Maybe QName
-fromModuleName (TopLevelModuleName _ [])
-  = Nothing
-fromModuleName (TopLevelModuleName _ (n : ns))
-  = Just (fromStrings n ns)
+  -> QName
+fromModuleName (TopLevelModuleName _ (n :| ns))
+  = fromStrings n ns
 
 fromStrings
   :: String
@@ -192,7 +194,7 @@ fromString
   :: String
   -> Name
 fromString n
-  = Name [Id n]
+  = Name (Id n :| [])
 
 -- | Conversion to Agda name type.
 toName
@@ -216,7 +218,7 @@ namePath
   :: Name
   -> String
 namePath (Name ps)
-  = mconcat (show <$> ps)
+  = sconcat (show <$> ps)
 
 -- | Convert a module name to a 'FilePath'.
 qNamePath
@@ -246,13 +248,13 @@ pathQNameRelative []
 pathQNameRelative [n]
   = QName <$> pathName n
 pathQNameRelative (n : ns@(_ : _))
-  = Qual (Name [Id n]) <$> pathQNameRelative ns
+  = Qual (Name (Id n :| [])) <$> pathQNameRelative ns
 
 pathName
   :: String
   -> Maybe Name
 pathName n
-  = Name . (: []) . Id <$> stripSuffix ".agda" n
+  = Name . (:| []) . Id <$> stripSuffix ".agda" n
 
 -- ## Match
 

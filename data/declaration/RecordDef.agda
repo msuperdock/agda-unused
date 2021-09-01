@@ -25,5 +25,5 @@ record R {z} _ where
 postulate
 
   r
-    : R tt
+    : R {tt} tt
 

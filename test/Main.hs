@@ -21,6 +21,8 @@ import qualified Agda.Unused.Types.Range
 
 import Data.Maybe
   (mapMaybe)
+import Data.List.NonEmpty
+  (NonEmpty(..))
 import qualified Data.Set
   as Set
 import Data.Text
@@ -38,40 +40,52 @@ import Paths_agda_unused
 
 -- ## Names
 
+name0
+  :: String
+  -> Name
+name0 n
+  = Name (Id n :| [])
+
+name2
+  :: String
+  -> Name
+name2 n
+  = Name (Hole :| Id n : Hole : [])
+
 name
   :: String
   -> QName
 name n
-  = QName (Name [Id n])
-
+  = QName (name0 n)
+ 
 land
   :: QName
 land
-  = QName (Name [Hole, Id "&&", Hole])
+  = QName (name2 "&&")
 
 bind
   :: QName
 bind
-  = QName (Name [Hole, Id ">>=", Hole])
+  = QName (name2 ">>=")
 
 bind_
   :: QName
 bind_
-  = QName (Name [Hole, Id ">>", Hole])
+  = QName (name2 ">>")
 
 agdaBuiltinBool
   :: QName
 agdaBuiltinBool
-  = Qual (Name [Id "Agda"])
-  $ Qual (Name [Id "Builtin"])
-  $ QName (Name [Id "Bool"])
+  = Qual (name0 "Agda")
+  $ Qual (name0 "Builtin")
+  $ QName (name0 "Bool")
 
 agdaBuiltinNat
   :: QName
 agdaBuiltinNat
-  = Qual (Name [Id "Agda"])
-  $ Qual (Name [Id "Builtin"])
-  $ QName (Name [Id "Nat"])
+  = Qual (name0 "Agda")
+  $ Qual (name0 "Builtin")
+  $ QName (name0 "Nat")
 
 -- ## Ranges
 

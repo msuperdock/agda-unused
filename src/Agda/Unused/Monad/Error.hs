@@ -195,6 +195,10 @@ data UnexpectedError where
 -- | An error indicating that an unsupported language was found.
 data UnsupportedError where
 
+  -- | Lone constructors.
+  UnsupportedLoneConstructor
+    :: UnsupportedError
+
   -- | Record module instance applications.
   UnsupportedMacro
     :: UnsupportedError

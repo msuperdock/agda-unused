@@ -21,8 +21,12 @@ import Agda.Unused.Types.Range
 
 import Agda.Interaction.FindFile
   (FindError(..))
+import Agda.Syntax.Concrete.Definitions.Errors
+  (DeclarationException(..))
 import Agda.Utils.Pretty
   (prettyShow)
+import Data.Semigroup
+  (sconcat)
 import Data.Text
   (Text)
 import qualified Data.Text
@@ -54,13 +58,13 @@ printNamePart
   :: NamePart
   -> Text
 printNamePart
-  = T.pack . show
+  = T.pack . prettyShow
 
 printName
   :: Name
   -> Text
 printName (Name ps)
-  = mconcat (printNamePart <$> ps)
+  = sconcat (printNamePart <$> ps)
 
 printQName
   :: QName
@@ -78,7 +82,7 @@ printRange
 printRange NoRange
   = "unknown location"
 printRange r@(Range _ _)
-  = T.pack (show r)
+  = T.pack (prettyShow r)
 
 -- ## Messages
 
@@ -134,7 +138,7 @@ printError (ErrorUnsupported e r)
   = printMessage (printRange r)
   $ "Error: " <> printUnsupportedError e <> " not supported."
 
-printError (ErrorDeclaration e)
+printError (ErrorDeclaration (DeclarationException _ e))
   = printRange (getRange e) <> "\n" <> T.pack (prettyShow e)
 printError (ErrorFile p)
   = printErrorFile p
@@ -205,6 +209,8 @@ printUnexpectedError UnexpectedOpAppP
 printUnsupportedError
   :: UnsupportedError
   -> Text
+printUnsupportedError UnsupportedLoneConstructor
+  = "Lone constructors"
 printUnsupportedError UnsupportedMacro
   = "Record module instance applications"
 printUnsupportedError UnsupportedUnquote

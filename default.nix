@@ -1,5 +1,5 @@
 { mkDerivation, aeson, Agda, base, containers, directory, filepath
-, hspec, mtl, optparse-applicative, stdenv, text
+, hspec, lib, mtl, optparse-applicative, text
 }:
 mkDerivation {
   pname = "agda-unused";
@@ -16,5 +16,5 @@ mkDerivation {
   ];
   testHaskellDepends = [ base containers filepath hspec text ];
   description = "Check for unused code in an Agda project";
-  license = stdenv.lib.licenses.mit;
+  license = lib.licenses.mit;
 }

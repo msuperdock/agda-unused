@@ -1,7 +1,7 @@
 {- |
 Module: Agda.Unused.Utils
 
-Utility functions for 'Maybe', 'Either', and 'List' types.
+Utility functions.
 -}
 module Agda.Unused.Utils
 

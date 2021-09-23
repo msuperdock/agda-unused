@@ -138,7 +138,7 @@ fromName (N.NoName _ _)
 fromName (N.Name _ _ n)
   = Just (Name n)
 
--- | Like 'fromName', but also return a 'Range'.
+-- | Like 'fromName', but also return a range.
 fromNameRange
   :: N.Name
   -> Maybe (Range, Name)
@@ -156,7 +156,7 @@ fromQName (N.QName n)
 fromQName (N.Qual n ns)
   = Qual <$> fromName n <*> fromQName ns
 
--- | Like 'fromQName', but also return a 'Range'.
+-- | Like 'fromQName', but also return a range.
 fromQNameRange
   :: N.QName
   -> Maybe (Range, QName)

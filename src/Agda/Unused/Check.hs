@@ -39,7 +39,7 @@ import Agda.Unused.Types.Name
   (Name(..), QName(..), fromAsName, fromModuleName, fromName, fromNameRange,
     fromQName, fromQNameRange, nameIds, pathQName, qNamePath, toQName)
 import Agda.Unused.Types.Range
-  (Range'(..), RangeInfo(..), RangeType(..), rangePath)
+  (RangeInfo(..), RangeType(..), rangePath)
 import Agda.Unused.Utils
   (liftMaybe, mapLeft)
 
@@ -72,7 +72,7 @@ import qualified Agda.Syntax.Concrete.Name
 import Agda.Syntax.Parser
   (moduleParser, parseFile, runPMIO)
 import Agda.Syntax.Position
-  (Range, getRange)
+  (Range, Range'(..), getRange)
 import Agda.TypeChecking.Monad.Base
   (TCM, runTCMTop)
 import Agda.TypeChecking.Monad.Options

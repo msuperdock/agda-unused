@@ -75,9 +75,9 @@ import Agda.Unused.Types.Access
   (Access(..))
 import Agda.Unused.Types.Name
   (Name, QName(..), matchOperators, stripPrefix)
-import Agda.Unused.Types.Range
-  (Range)
 
+import Agda.Syntax.Position
+  (Range)
 import Data.Map.Strict
   (Map)
 import qualified Data.Map.Strict

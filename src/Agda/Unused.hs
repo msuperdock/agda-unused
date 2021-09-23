@@ -11,8 +11,10 @@ module Agda.Unused
   ) where
 
 import Agda.Unused.Types.Range
-  (Range, RangeInfo)
+  (RangeInfo)
 
+import Agda.Syntax.Position
+  (Range)
 import Data.Text
   (Text)
 

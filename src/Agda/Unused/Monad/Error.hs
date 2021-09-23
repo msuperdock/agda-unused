@@ -24,8 +24,6 @@ import Agda.Unused.Types.Context
   (LookupError(..))
 import Agda.Unused.Types.Name
   (QName)
-import Agda.Unused.Types.Range
-  (Range, getRange)
 
 import Agda.Interaction.FindFile
   (FindError)
@@ -35,6 +33,8 @@ import Agda.Syntax.Concrete.Fixity
   (MonadFixityError(..))
 import Agda.Syntax.Parser
   (ParseError)
+import Agda.Syntax.Position
+  (Range, getRange)
 import Control.Monad.Except
   (MonadError, throwError)
 

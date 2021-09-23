@@ -17,12 +17,14 @@ import Agda.Unused.Monad.Error
 import Agda.Unused.Types.Name
   (Name(..), NamePart(..), QName(..))
 import Agda.Unused.Types.Range
-  (Range, Range'(..), RangeInfo(..), RangeType(..), getRange)
+  (RangeInfo(..), RangeType(..))
 
 import Agda.Interaction.FindFile
   (FindError(..))
 import Agda.Syntax.Concrete.Definitions.Errors
   (DeclarationException(..))
+import Agda.Syntax.Position
+  (Range, Range'(..), getRange)
 import Agda.Utils.Pretty
   (prettyShow)
 import Data.Semigroup

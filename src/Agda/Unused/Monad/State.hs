@@ -38,8 +38,10 @@ import Agda.Unused.Types.Context
 import Agda.Unused.Types.Name
   (QName)
 import Agda.Unused.Types.Range
-  (Range, Range'(..), RangeInfo, rangeContains)
+  (RangeInfo, rangeContains)
 
+import Agda.Syntax.Position
+  (Range, Range'(..))
 import Agda.TypeChecking.Monad.Base
   (ModuleToSource)
 import Control.Monad

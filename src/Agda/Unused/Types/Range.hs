@@ -7,14 +7,11 @@ module Agda.Unused.Types.Range
 
   ( -- * Definitions
 
-    Range
-  , Range'(..)
-  , RangeType(..)
+    RangeType(..)
   , RangeInfo(..)
 
     -- * Interface
 
-  , getRange
   , rangePath
   , rangeContains
 
@@ -24,7 +21,7 @@ import Agda.Unused.Types.Name
   (QName)
 
 import Agda.Syntax.Position
-  (PositionWithoutFile, Range, Range'(..), getRange, rEnd', rStart')
+  (PositionWithoutFile, Range, Range'(..), rEnd', rStart')
 import Agda.Utils.FileName
   (filePath)
 import qualified Agda.Utils.Maybe.Strict

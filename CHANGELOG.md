@@ -17,7 +17,7 @@ Initial release.
 - Check record types with fields referencing other fields (fixes bug).
 - Check import statements with `as _` (fixes bug).
 
-## 0.3.0
+## 0.3.0 (Nov 2022)
 
 - Support Agda 2.6.2; remove support for earlier versions.
 

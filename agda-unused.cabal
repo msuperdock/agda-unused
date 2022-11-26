@@ -3,7 +3,7 @@ cabal-version: 3.0
 name:
   agda-unused
 version:
-  0.3.0
+  0.3.1
 build-type:
   Simple
 license:
@@ -46,12 +46,12 @@ library
     Agda.Unused.Types.Range
     Agda.Unused.Utils
   build-depends:
-    base >= 4.13 && < 4.15,
+    base >= 4.13 && < 4.18,
     Agda >= 2.6.2 && < 2.6.3,
     containers >= 0.6.2 && < 0.7,
     directory >= 1.3.6 && < 1.4,
     filepath >= 1.4.2 && < 1.5,
-    mtl >= 2.2.2 && < 2.3,
+    mtl >= 2.2.2 && < 2.4,
     text >= 1.2.4 && < 1.3
   default-language:
     Haskell2010
@@ -71,11 +71,11 @@ executable agda-unused
     Main.hs
   build-depends:
     agda-unused,
-    base >= 4.13 && < 4.15,
-    aeson >= 1.4.7 && < 1.6,
+    base >= 4.13 && < 4.18,
+    aeson >= 2 && < 2.2,
     directory >= 1.3.6 && < 1.4,
-    mtl >= 2.2.2 && < 2.3,
-    optparse-applicative >= 0.15.1 && < 0.17,
+    mtl >= 2.2.2 && < 2.4,
+    optparse-applicative >= 0.15.1 && < 0.18,
     text >= 1.2.4 && < 1.3
   default-language:
     Haskell2010
@@ -99,10 +99,10 @@ test-suite test
     Paths_agda_unused
   build-depends:
     agda-unused,
-    base >= 4.13 && < 4.15,
+    base >= 4.13 && < 4.18,
     containers >= 0.6.2 && < 0.7,
     filepath >= 1.4.2 && < 1.5,
-    hspec >= 2.7.1 && < 2.8,
+    hspec >= 2.7.1 && < 2.9,
     text >= 1.2.4 && < 1.3
   default-language:
     Haskell2010

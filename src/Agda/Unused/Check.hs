@@ -1852,9 +1852,10 @@ checkFileWith
   -> m Context
 checkFileWith r n Nothing
   = askRoot
-  >>= \p -> pure (p </> qNamePath n)
-  >>= \p' -> liftIO (doesFileExist p')
-  >>= \b -> checkFileWith' r n (bool Nothing (Just p') b)
+  >>= \p -> liftMaybe (ErrorInternal (ErrorName r)) (qNamePath n)
+  >>= \p' -> pure (p </> p')
+  >>= \p'' -> liftIO (doesFileExist p'')
+  >>= \b -> checkFileWith' r n (bool Nothing (Just p'') b)
 checkFileWith r n (Just Blocked)
   = throwError (ErrorCyclic r n)
 checkFileWith _ _ (Just (Checked c))

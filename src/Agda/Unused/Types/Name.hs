@@ -60,8 +60,6 @@ import qualified Data.List.NonEmpty
   as NonEmpty
 import Data.Maybe
   (mapMaybe)
-import Data.Semigroup
-  (sconcat)
 import System.FilePath
   ((</>), (<.>), splitDirectories)
 
@@ -216,18 +214,23 @@ toQName (Qual n ns)
 
 namePath
   :: Name
-  -> String
-namePath (Name ps)
-  = sconcat (show <$> ps)
+  -> Maybe String
+namePath (Name (Id p :| _))
+  = Just p
+namePath _
+  = Nothing
 
 -- | Convert a module name to a 'FilePath'.
 qNamePath
   :: QName
-  -> FilePath
+  -> Maybe FilePath
 qNamePath (QName n)
-  = namePath n <.> "agda"
+  = namePath n
+  >>= \p -> pure (p <.> "agda")
 qNamePath (Qual n ns)
-  = namePath n </> qNamePath ns
+  = namePath n
+  >>= \p -> qNamePath ns
+  >>= \ps -> pure (p </> ps)
 
 -- | Convert a 'FilePath' to a module name.
 pathQName

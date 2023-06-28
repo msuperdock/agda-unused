@@ -60,6 +60,8 @@ import Agda.Syntax.Concrete
     ModuleApplication(..), ModuleAssignment(..), OpenShortHand(..), Pattern(..),
     RecordAssignment, RecordDirectives, Renaming, RewriteEqn, RHS, RHS'(..),
     TypedBinding, TypedBinding'(..), WhereClause, WhereClause'(..), _exprFieldA)
+import qualified Agda.Syntax.Concrete
+  as Concrete
 import Agda.Syntax.Concrete.Definitions
   (Clause(..), NiceConstructor, NiceDeclaration(..), niceDeclarations, runNice)
 import Agda.Syntax.Concrete.Fixity
@@ -1000,6 +1002,18 @@ checkRewriteEqns
 checkRewriteEqns
   = checkFold checkRewriteEqn
 
+checkIrrefutableLet
+  :: MonadError Error m
+  => MonadReader Environment m
+  => MonadState State m
+  => MonadIO m
+  => AccessContext
+  -> LHS
+  -> RHS
+  -> m AccessContext
+checkIrrefutableLet c l r
+  = checkRHS c r >> checkLHS c l
+
 checkIrrefutableWith
   :: MonadError Error m
   => MonadReader Environment m
@@ -1217,8 +1231,6 @@ checkNiceDeclaration' fs c (NiceRecSig _ a _ _ _ n bs e)
   = checkNiceSig fs c a RangeRecord n bs e
 checkNiceDeclaration' fs c (NiceDataSig _ a _ _ _ n bs e)
   = checkNiceSig fs c a RangeData n bs e
-checkNiceDeclaration' _ _ (NiceFunClause r _ _ _ _ _ _)
-  = throwError (ErrorInternal (ErrorUnexpected UnexpectedNiceFunClause r))
 checkNiceDeclaration' fs c (FunSig _ a _ _ _ _ _ _ n e)
   = checkExpr c e >> checkName' False fs (fromAccess a) RangeDefinition n
 checkNiceDeclaration' _ c (FunDef _ _ _ _ _ _ _ cs)
@@ -1290,6 +1302,13 @@ checkNiceDeclaration' _ _ (NiceImport r n (Just a) DoOpen i)
   >>= \c' -> checkImportDirective Import r n' c' i
   >>= \c'' -> checkModuleNameMay c' Public (getRange a) (fromAsName a)
   >>= \c''' -> pure (c''' <> fromContext (importDirectiveAccess i) c'')
+
+checkNiceDeclaration' _ c
+  (NiceFunClause _ _ _ _ _ _ (Concrete.FunClause l r _ _))
+  = checkIrrefutableLet c l r
+checkNiceDeclaration' _ _
+  (NiceFunClause r _ _ _ _ _ _)
+  = throwError (ErrorInternal (ErrorUnexpected UnexpectedNiceFunClause r))
 
 checkNiceDeclaration' fs c (NicePatternSyn _ a n ns p)
   = localSkip (checkNames' False Public RangeVariable (unArg <$> ns))

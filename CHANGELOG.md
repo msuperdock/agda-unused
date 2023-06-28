@@ -24,5 +24,6 @@ Initial release.
 ## 0.4.0
 
 - Support Agda 2.6.3; remove support for earlier versions.
+- Support irrefutable let-patterns (fixes bug).
 - Resolve imports correctly within the current project (fixes bug).
 

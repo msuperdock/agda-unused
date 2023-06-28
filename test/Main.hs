@@ -555,7 +555,11 @@ testResult t
   Expression Let ->
     [ private (name "z")
       ~: Definition
+    , private (name "z'")
+      ~: Variable
     , public (name "f")
+      ~: Definition
+    , public (name "g")
       ~: Definition
     ]
 

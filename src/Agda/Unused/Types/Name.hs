@@ -45,11 +45,13 @@ import Agda.Unused.Utils
 import Agda.Syntax.Concrete
   (AsName, AsName'(..))
 import Agda.Syntax.Concrete.Name
-  (NameInScope(..), NamePart(..), TopLevelModuleName(..))
+  (NameInScope(..), NamePart(..))
 import qualified Agda.Syntax.Concrete.Name
   as N
 import Agda.Syntax.Position
   (Range, Range'(..))
+import Agda.Syntax.TopLevelModuleName
+  (RawTopLevelModuleName(..))
 import Data.List
   (isSubsequenceOf)
 import qualified Data.List
@@ -60,6 +62,8 @@ import qualified Data.List.NonEmpty
   as NonEmpty
 import Data.Maybe
   (mapMaybe)
+import Data.Text
+  (Text, unpack)
 import System.FilePath
   ((</>), (<.>), splitDirectories)
 
@@ -174,25 +178,25 @@ fromAsName (AsName (Right n) _)
 
 -- | Conversion from Agda top level module name type.
 fromModuleName
-  :: TopLevelModuleName
+  :: RawTopLevelModuleName
   -> QName
-fromModuleName (TopLevelModuleName _ (n :| ns))
-  = fromStrings n ns
+fromModuleName (RawTopLevelModuleName _ (n :| ns))
+  = fromTexts n ns
 
-fromStrings
-  :: String
-  -> [String]
+fromTexts
+  :: Text
+  -> [Text]
   -> QName
-fromStrings n []
-  = QName (fromString n)
-fromStrings n (n' : ns)
-  = Qual (fromString n) (fromStrings n' ns)
+fromTexts n []
+  = QName (fromText n)
+fromTexts n (n' : ns)
+  = Qual (fromText n) (fromTexts n' ns)
 
-fromString
-  :: String
+fromText
+  :: Text
   -> Name
-fromString n
-  = Name (Id n :| [])
+fromText n
+  = Name (Id (unpack n) :| [])
 
 -- | Conversion to Agda name type.
 toName

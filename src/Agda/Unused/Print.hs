@@ -193,8 +193,6 @@ printUnexpectedError UnexpectedAs
   = "As"
 printUnexpectedError UnexpectedDontCare
   = "DontCare"
-printUnexpectedError UnexpectedETel
-  = "ETel"
 printUnexpectedError UnexpectedEllipsis
   = "Ellipsis"
 printUnexpectedError UnexpectedEqual

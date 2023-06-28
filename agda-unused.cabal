@@ -46,8 +46,8 @@ library
     Agda.Unused.Types.Range
     Agda.Unused.Utils
   build-depends:
-    base >= 4.13 && < 4.18,
-    Agda >= 2.6.2 && < 2.6.3,
+    base >= 4.13 && < 4.19,
+    Agda >= 2.6.3 && < 2.6.4,
     containers >= 0.6.2 && < 0.7,
     directory >= 1.3.6 && < 1.4,
     filepath >= 1.4.2 && < 1.5,
@@ -71,11 +71,11 @@ executable agda-unused
     Main.hs
   build-depends:
     agda-unused,
-    base >= 4.13 && < 4.18,
-    aeson >= 2 && < 2.2,
+    base >= 4.13 && < 4.19,
+    aeson >= 2 && < 2.3,
     directory >= 1.3.6 && < 1.4,
     mtl >= 2.2.2 && < 2.4,
-    optparse-applicative >= 0.15.1 && < 0.18,
+    optparse-applicative >= 0.15.1 && < 0.19,
     text >= 1.2.4 && < 2.1
   default-language:
     Haskell2010
@@ -99,10 +99,10 @@ test-suite test
     Paths_agda_unused
   build-depends:
     agda-unused,
-    base >= 4.13 && < 4.18,
+    base >= 4.13 && < 4.19,
     containers >= 0.6.2 && < 0.7,
     filepath >= 1.4.2 && < 1.5,
-    hspec >= 2.7.1 && < 2.9,
+    hspec >= 2.7.1 && < 2.12,
     text >= 1.2.4 && < 2.1
   default-language:
     Haskell2010

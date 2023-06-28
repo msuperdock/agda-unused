@@ -18,6 +18,7 @@ module Agda.Unused.Monad.State
 
     -- * Get
 
+  , getHash
   , getModule
   , getSources
 
@@ -40,6 +41,8 @@ import Agda.Unused.Types.Name
 import Agda.Unused.Types.Range
   (RangeInfo, rangeContains)
 
+import Agda.Syntax.Common
+  (ModuleNameHash(..))
 import Agda.Syntax.Position
   (Range, Range'(..))
 import Agda.TypeChecking.Monad.Base
@@ -56,6 +59,8 @@ import qualified Data.Map.Strict
   as Map
 import Data.Set
   (Set)
+import Data.Word
+  (Word64)
 
 -- ## Definitions
 
@@ -86,6 +91,9 @@ data State
   , stateSources'
     :: !ModuleToSource
     -- ^ A cache of source paths corresponding to certain module names.
+  , stateHash
+    :: !Word64
+    -- ^ An integer to use as the next module hash.
   } deriving Show
 
 -- ## Interface
@@ -94,7 +102,7 @@ data State
 stateEmpty
   :: State
 stateEmpty
-  = State mempty mempty mempty
+  = State mempty mempty mempty 0
 
 -- | Get a sorted list of state items.
 --
@@ -133,8 +141,8 @@ stateSources
   :: ModuleToSource
   -> State
   -> State
-stateSources ss (State rs ms _)
-  = State rs ms ss
+stateSources ss (State rs ms _ h)
+  = State rs ms ss h
 
 stateInsert
   :: Range
@@ -143,39 +151,56 @@ stateInsert
   -> State
 stateInsert NoRange _ s
   = s
-stateInsert r@(Range _ _) i (State rs ms ss)
-  = State (Map.insert r i rs) ms ss
+stateInsert r@(Range _ _) i (State rs ms ss h)
+  = State (Map.insert r i rs) ms ss h
 
 stateDelete
   :: Set Range
   -> State
   -> State
-stateDelete rs (State rs' ms ss)
-  = State (Map.withoutKeys rs' rs) ms ss
+stateDelete rs (State rs' ms ss h)
+  = State (Map.withoutKeys rs' rs) ms ss h
 
 stateModule
   :: QName
   -> State
   -> Maybe ModuleState
-stateModule n (State _ ms _)
+stateModule n (State _ ms _ _)
   = Map.lookup n ms
 
 stateBlock
   :: QName
   -> State
   -> State
-stateBlock n (State rs ms ss)
-  = State rs (Map.insert n Blocked ms) ss
+stateBlock n (State rs ms ss h)
+  = State rs (Map.insert n Blocked ms) ss h
 
 stateCheck
   :: QName
   -> Context
   -> State
   -> State
-stateCheck n c (State rs ms ss)
-  = State rs (Map.insert n (Checked c) ms) ss
+stateCheck n c (State rs ms ss h)
+  = State rs (Map.insert n (Checked c) ms) ss h
+
+stateIncrementHash
+  :: State
+  -> State
+stateIncrementHash (State rs ms ss h)
+  = State rs ms ss (succ h)
 
 -- ## Get
+
+-- | Get a fresh hash.
+getHash
+  :: MonadState State m
+  => m ModuleNameHash
+getHash = do
+  hash
+    <- gets stateHash
+  _
+    <- modify stateIncrementHash
+  pure (ModuleNameHash hash)
 
 -- | Get the state of a module.
 getModule

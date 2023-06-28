@@ -18,9 +18,9 @@ import Agda.Unused.Monad.Reader
   (Environment(..), Mode(..), askGlobalMain, askIncludes, askLocal, askRoot,
     askSkip, localGlobal, localSkip)
 import Agda.Unused.Monad.State
-  (ModuleState(..), State, getModule, getSources, modifyBlock, modifyCheck,
-    modifyDelete, modifyInsert, modifySources, stateEmpty, stateItems,
-    stateModules)
+  (ModuleState(..), State, getHash, getModule, getSources, modifyBlock,
+    modifyCheck, modifyDelete, modifyInsert, modifySources, stateEmpty,
+    stateItems, stateModules)
 import Agda.Unused.Types.Access
   (Access(..), fromAccess)
 import Agda.Unused.Types.Context
@@ -48,8 +48,8 @@ import Agda.Interaction.FindFile
 import Agda.Interaction.Options
   (CommandLineOptions(..), defaultOptions)
 import Agda.Syntax.Common
-  (Arg(..), Fixity'(..), GenPart(..), ImportDirective'(..), ImportedName'(..),
-    Named(..), Ranged(..), RecordDirectives'(..), Renaming'(..),
+  (Arg(..), Fixity'(..), ImportDirective'(..), ImportedName'(..),
+    Named(..), NotationPart(..), Ranged(..), RecordDirectives'(..), Renaming'(..),
     RewriteEqn'(..), Using'(..), namedThing, unArg)
 import qualified Agda.Syntax.Common
   as Common
@@ -59,20 +59,23 @@ import Agda.Syntax.Concrete
     LamBinding, LamBinding'(..), LamClause(..), LHS(..), Module(..),
     ModuleApplication(..), ModuleAssignment(..), OpenShortHand(..), Pattern(..),
     RecordAssignment, RecordDirectives, Renaming, RewriteEqn, RHS, RHS'(..),
-    TypedBinding, TypedBinding'(..), WhereClause, WhereClause'(..), _exprFieldA,
-    topLevelModuleName)
+    TypedBinding, TypedBinding'(..), WhereClause, WhereClause'(..), _exprFieldA)
 import Agda.Syntax.Concrete.Definitions
   (Clause(..), NiceConstructor, NiceDeclaration(..), niceDeclarations, runNice)
 import Agda.Syntax.Concrete.Fixity
   (DoWarn(..), Fixities, fixitiesAndPolarities)
 import Agda.Syntax.Concrete.Name
-  (NameInScope(..), NamePart(..), nameRange, projectRoot, toTopLevelModuleName)
+  (NameInScope(..), NamePart(..), nameRange)
 import qualified Agda.Syntax.Concrete.Name
   as N
 import Agda.Syntax.Parser
   (moduleParser, parseFile, runPMIO)
 import Agda.Syntax.Position
-  (Range, Range'(..), getRange)
+  (Range, Range'(..), RangeFile(..), getRange)
+import Agda.Syntax.TopLevelModuleName
+  (RawTopLevelModuleName, TopLevelModuleName, projectRoot,
+    rawTopLevelModuleNameForModule, rawTopLevelModuleNameForQName,
+    unsafeTopLevelModuleName)
 import Agda.TypeChecking.Monad.Base
   (TCM, runTCMTop)
 import Agda.TypeChecking.Monad.Options
@@ -149,19 +152,19 @@ fromFixity
   :: Fixity'
   -> Maybe Name
 fromFixity (Fixity' _ ps _)
-  = Name <$> nonEmpty (fromGenPart <$> ps)
+  = Name <$> nonEmpty (fromNotationPart <$> ps)
 
-fromGenPart
-  :: GenPart
+fromNotationPart
+  :: NotationPart
   -> NamePart
-fromGenPart (BindHole _ _)
-  = Hole
-fromGenPart (NormalHole _ _)
-  = Hole
-fromGenPart (WildHole _)
-  = Hole
-fromGenPart (IdPart (Ranged _ s))
+fromNotationPart (IdPart (Ranged _ s))
   = Id s
+fromNotationPart (HolePart _ _)
+  = Hole
+fromNotationPart (VarPart _ _)
+  = Hole
+fromNotationPart (WildPart _)
+  = Hole
 
 -- ## Lists
 
@@ -425,7 +428,7 @@ checkBinder
   -> AccessContext
   -> Binder
   -> m AccessContext
-checkBinder b c (Binder p (BName n _ _))
+checkBinder b c (Binder p (BName n _ _ _))
   = bool localSkip id b (checkName' False mempty Public RangeVariable n)
   >>= \c' -> checkPatternMay c p
   >>= \c'' -> pure (c' <> c'')
@@ -526,7 +529,7 @@ checkTypedBindings1 b
   = checkFold1 (checkTypedBinding b)
 
 -- ## Patterns
- 
+
 checkPattern
   :: MonadError Error m
   => MonadReader Environment m
@@ -699,8 +702,6 @@ checkExpr c (Dot _ e)
   = checkExpr c e
 checkExpr c (DoubleDot _ e)
   = checkExpr c e
-checkExpr _ e@(ETel _)
-  = throwError (ErrorInternal (ErrorUnexpected UnexpectedETel (getRange e)))
 checkExpr _ (Quote _)
   = pure ()
 checkExpr _ (QuoteTerm _)
@@ -1234,6 +1235,8 @@ checkNiceDeclaration' _ _ (NiceUnquoteDecl r _ _ _ _ _ _ _)
   = throwError (ErrorUnsupported UnsupportedUnquote r)
 checkNiceDeclaration' _ _ (NiceUnquoteDef r _ _ _ _ _ _)
   = throwError (ErrorUnsupported UnsupportedUnquote r)
+checkNiceDeclaration' _ _ (NiceUnquoteData r _ _ _ _ _ _ _)
+  = throwError (ErrorUnsupported UnsupportedUnquote r)
 
 checkNiceDeclaration' fs c
   (NiceMutual _ _ _ _
@@ -1344,6 +1347,8 @@ checkNiceDeclarationRecord _ _ fs c d@(NiceGeneralize _ _ _ _ _ _)
 checkNiceDeclarationRecord _ _ fs c d@(NiceUnquoteDecl _ _ _ _ _ _ _ _)
   = checkNiceDeclaration fs c d
 checkNiceDeclarationRecord _ _ fs c d@(NiceUnquoteDef _ _ _ _ _ _ _)
+  = checkNiceDeclaration fs c d
+checkNiceDeclarationRecord _ _ fs c d@(NiceUnquoteData _ _ _ _ _ _ _ _)
   = checkNiceDeclaration fs c d
 
 checkNiceDeclarationRecord n rs fs c (NiceField _ a _ _ _ n' (Arg _ e))
@@ -1888,8 +1893,12 @@ checkFileExternal r n = do
     <- askIncludes
   sources
     <- getSources
-  (pathEither, sources') 
-    <- liftIO (findFile'' includes (toTopLevelModuleName (toQName n)) sources)
+  rawModuleName
+    <- pure (rawTopLevelModuleNameForQName (toQName n))
+  moduleName
+    <- topLevelModuleName rawModuleName
+  (pathEither, sources')
+    <- liftIO (findFile'' includes moduleName sources)
   path
     <- liftEither (mapLeft (ErrorFind r n) pathEither)
   _
@@ -1919,13 +1928,28 @@ checkFileTop
   -- ^ The file to check.
   -> m (FilePath, State)
   -- ^ The project root, along with the final state.
-checkFileTop m opts p = do
+checkFileTop m opts p
+  = runStateT (checkFileTop' m opts p) stateEmpty
+
+checkFileTop'
+  :: MonadError Error m
+  => MonadState State m
+  => MonadIO m
+  => Mode
+  -> UnusedOptions
+  -> FilePath
+  -- ^ The file to check.
+  -> m FilePath
+  -- ^ The project root.
+checkFileTop' m opts p = do
   module'
     <- readModule p
+  rawModuleName
+    <- pure (rawTopLevelModuleNameForModule module')
   moduleName
-    <- pure (topLevelModuleName module')
+    <- topLevelModuleName rawModuleName
   moduleQName
-    <- pure (fromModuleName moduleName)
+    <- pure (fromModuleName rawModuleName)
   absolutePath
     <- pure (projectRoot (mkAbsolute p) moduleName)
   rootPath
@@ -1936,9 +1960,9 @@ checkFileTop m opts p = do
     <- liftEither (mapLeft (const ErrorInclude) includesEither)
   env
     <- pure (Environment m rootPath includes)
-  (_, state)
-    <- runStateT (runReaderT (checkModule moduleQName module') env) stateEmpty
-  pure (rootPath, state)
+  _
+    <- runReaderT (checkModule moduleQName module') env
+  pure rootPath
 
 readModule
   :: MonadError Error m
@@ -1950,15 +1974,22 @@ readModule p = do
     <- liftIO (doesFileExist p)
   _
     <- unless exists (throwError (ErrorFile p))
-  absolutePath
-    <- pure (mkAbsolute p)
+  rangeFile
+    <- pure (RangeFile (mkAbsolute p) Nothing)
   contents
     <- liftIO (readFile p)
   (parseResult, _)
-    <- liftIO (runPMIO (parseFile moduleParser absolutePath contents))
-  (module', _)
+    <- liftIO (runPMIO (parseFile moduleParser rangeFile contents))
+  ((module', _), _)
     <- liftEither (mapLeft ErrorParse parseResult)
   pure module'
+
+topLevelModuleName
+  :: MonadState State m
+  => RawTopLevelModuleName
+  -> m TopLevelModuleName
+topLevelModuleName n
+  = unsafeTopLevelModuleName n <$> getHash
 
 -- ## Paths
 

@@ -17,7 +17,7 @@ flag, `agda-unused` treats the given file as a description of the public
 interface of the project, and additionally checks for unused files and unused
 public items in dependencies. (See below for more on `--global`.)
 
-Supported Agda versions: `>= 2.6.2 && < 2.6.3`
+Supported Agda versions: `>= 2.6.3 && < 2.6.4`
 
 ## Example
 

@@ -169,9 +169,6 @@ data UnexpectedError where
   UnexpectedDontCare
     :: UnexpectedError
 
-  UnexpectedETel
-    :: UnexpectedError
-
   UnexpectedEllipsis
     :: UnexpectedError
 

@@ -21,7 +21,7 @@ import Agda.Unused.Types.Name
   (QName)
 
 import Agda.Syntax.Position
-  (PositionWithoutFile, Range, Range'(..), rEnd', rStart')
+  (PositionWithoutFile, Range, Range'(..), RangeFile(..), rEnd', rStart')
 import Agda.Utils.FileName
   (filePath)
 import qualified Agda.Utils.Maybe.Strict
@@ -92,7 +92,7 @@ data RangeInfo where
 rangePath
   :: Range
   -> Maybe FilePath
-rangePath (Range (S.Just p) _)
+rangePath (Range (S.Just (RangeFile p _)) _)
   = Just (filePath p)
 rangePath _
   = Nothing

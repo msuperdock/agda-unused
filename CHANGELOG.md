@@ -21,3 +21,8 @@ Initial release.
 
 - Support Agda 2.6.2; remove support for earlier versions.
 
+## 0.4.0 (Jun 2023)
+
+- Support Agda 2.6.3; remove support for earlier versions.
+- Resolve imports correctly within the current project (fixes bug).
+

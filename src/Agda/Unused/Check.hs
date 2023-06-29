@@ -304,16 +304,6 @@ checkQNamePWith (Just False) _ _ _
 checkQNamePWith (Just True) c r n
   = touchQName c r n >> pure mempty
 
-checkQNameP'
-  :: MonadError Error m
-  => MonadReader Environment m
-  => MonadState State m
-  => AccessContext
-  -> N.QName
-  -> m AccessContext
-checkQNameP' c n
-  = maybe (pure mempty) (uncurry (checkQNameP c)) (fromQNameRange n)
-
 checkQName
   :: MonadReader Environment m
   => MonadState State m
@@ -532,6 +522,87 @@ checkTypedBindings1 b
 
 -- ## Patterns
 
+data PatternRec m
+  = PatternRec
+  { checkIdentP
+    :: AccessContext
+    -> Range
+    -> QName
+    -> m AccessContext
+  , checkAsP
+    :: Range
+    -> Name
+    -> m AccessContext
+  , checkRawAppP
+    :: (AccessContext -> Pattern -> m AccessContext)
+    -> AccessContext
+    -> [Pattern]
+    -> m AccessContext
+  }
+
+checkPatternRec
+  :: MonadError Error m
+  => MonadReader Environment m
+  => MonadState State m
+  => MonadIO m
+  => PatternRec m
+  -> AccessContext
+  -> Pattern
+  -> m AccessContext
+checkPatternRec r c (IdentP n)
+  = maybe (pure mempty) (uncurry (checkIdentP r c)) (fromQNameRange n)
+checkPatternRec _ _ (QuoteP _)
+  = pure mempty
+checkPatternRec r c (AppP p (Arg _ (Named _ p')))
+  = (<>) <$> checkPatternRec r c p
+    <*> checkPatternRec r c p'
+checkPatternRec r c (RawAppP _ ps)
+  = checkRawAppP r (checkPatternRec r) c (List2.toList ps)
+checkPatternRec _ _ (OpAppP r _ _ _)
+  = throwError (ErrorInternal (ErrorUnexpected UnexpectedOpAppP r))
+checkPatternRec r c (HiddenP _ (Named _ p))
+  = checkPatternRec r c p
+checkPatternRec r c (InstanceP _ (Named _ p))
+  = checkPatternRec r c p
+checkPatternRec r c (ParenP _ p)
+  = checkPatternRec r c p
+checkPatternRec _ _ (WildP _)
+  = pure mempty
+checkPatternRec _ _ (AbsurdP _)
+  = pure mempty
+checkPatternRec r c (AsP _ n p)
+  = (<>) <$> maybe (pure mempty) (uncurry (checkAsP r)) (fromNameRange n)
+    <*> checkPatternRec r c p
+checkPatternRec _ c (DotP _ e)
+  = checkExpr c e >> pure mempty
+checkPatternRec _ _ (LitP _ _)
+  = pure mempty
+checkPatternRec _ c (RecP _ as)
+  = checkSequence checkPattern c (_exprFieldA <$> as)
+checkPatternRec _ c (EqualP _ es)
+  = checkExprPairs c es >> pure mempty
+checkPatternRec _ _ (EllipsisP _ _)
+  = pure mempty
+checkPatternRec r c (WithP _ p)
+  = checkPatternRec r c p
+
+patternRec
+  :: MonadError Error m
+  => MonadReader Environment m
+  => MonadState State m
+  => PatternRec m
+patternRec
+  = PatternRec
+  { checkIdentP
+    = checkQNameP
+  , checkAsP
+    = checkName False mempty Public RangeVariable
+  , checkRawAppP
+    = \f c ps -> pure (accessContextMatch (patternNames ps) c)
+    >>= \ns -> touchNames c ns
+    >> checkSequence f c (patternDelete ns ps)
+  }
+
 checkPattern
   :: MonadError Error m
   => MonadReader Environment m
@@ -540,46 +611,49 @@ checkPattern
   => AccessContext
   -> Pattern
   -> m AccessContext
-checkPattern c (IdentP n)
-  = checkQNameP' c n
-checkPattern _ (QuoteP _)
-  = pure mempty
-checkPattern c (RawAppP _ ps)
-  = checkRawAppP c (List2.toList ps)
-checkPattern _ (OpAppP r _ _ _)
-  = throwError (ErrorInternal (ErrorUnexpected UnexpectedOpAppP r))
-checkPattern c (HiddenP _ (Named _ p))
-  = checkPattern c p
-checkPattern c (InstanceP _ (Named _ p))
-  = checkPattern c p
-checkPattern c (ParenP _ p)
-  = checkPattern c p
-checkPattern _ (WildP _)
-  = pure mempty
-checkPattern _ (AbsurdP _)
-  = pure mempty
-checkPattern c (DotP _ e)
-  = checkExpr c e >> pure mempty
-checkPattern _ (LitP _ _)
-  = pure mempty
-checkPattern c (RecP _ as)
-  = checkPatterns c (_exprFieldA <$> as)
-checkPattern c (EqualP _ es)
-  = checkExprPairs c es >> pure mempty
-checkPattern _ (EllipsisP _ _)
-  = pure mempty
-checkPattern c (WithP _ p)
-  = checkPattern c p
+checkPattern
+  = checkPatternRec patternRec
 
-checkPattern c (AppP p (Arg _ (Named _ p')))
-  = (<>)
-  <$> checkPattern c p
-  <*> checkPattern c p'
+checkIdentPLet
+  :: MonadReader Environment m
+  => MonadState State m
+  => Maybe Name
+  -> AccessContext
+  -> Range
+  -> QName
+  -> m AccessContext
+checkIdentPLet (Just n) _ _ (QName n') | n == n'
+  = pure mempty
+checkIdentPLet _ _ r n
+  = checkQName Public RangeVariable r n
 
-checkPattern c (AsP _ n p)
-  = (<>)
-  <$> checkName' False mempty Public RangeVariable n
-  <*> checkPattern c p
+patternRecLet
+  :: MonadError Error m
+  => MonadReader Environment m
+  => MonadState State m
+  => Maybe Name
+  -> PatternRec m
+patternRecLet n
+  = PatternRec
+  { checkIdentP
+    = checkIdentPLet n
+  , checkAsP
+    = \r _ -> throwError (ErrorInternal (ErrorLet r))
+  , checkRawAppP
+    = checkSequence
+  }
+
+checkPatternLet
+  :: MonadError Error m
+  => MonadReader Environment m
+  => MonadState State m
+  => MonadIO m
+  => Maybe Name
+  -- ^ A name to ignore.
+  -> Pattern
+  -> m AccessContext
+checkPatternLet n
+  = checkPatternRec (patternRecLet n) mempty
 
 checkPatternMay
   :: MonadError Error m
@@ -604,19 +678,6 @@ checkPatterns
   -> m AccessContext
 checkPatterns
   = checkSequence checkPattern
-
-checkRawAppP
-  :: MonadError Error m
-  => MonadReader Environment m
-  => MonadState State m
-  => MonadIO m
-  => AccessContext
-  -> [Pattern]
-  -> m AccessContext
-checkRawAppP c ps
-  = pure (accessContextMatch (patternNames ps) c)
-  >>= \ns -> touchNames c ns
-  >> checkPatterns c (patternDelete ns ps)
 
 patternMatch
   :: [Name]
@@ -690,6 +751,8 @@ checkExpr c (Rec _ rs)
   = checkRecordAssignments c rs
 checkExpr c (RecUpdate _ e fs)
   = checkExpr c e >> checkFieldAssignments c fs
+checkExpr c (Let _ ds e)
+  = checkDeclarationsLet1 c ds >>= \c' -> traverse_ (checkExpr (c <> c')) e
 checkExpr c (Paren _ e)
   = checkExpr c e
 checkExpr c (IdiomBrackets _ es)
@@ -720,10 +783,6 @@ checkExpr _ (Ellipsis r)
   = throwError (ErrorInternal (ErrorUnexpected UnexpectedEllipsis r))
 checkExpr c (Generalized e)
   = checkExpr c e
-
-checkExpr c (Let _ ds e)
-  = checkDeclarations1 c ds
-  >>= \c' -> traverse_ (checkExpr (c <> c')) e
 
 checkExprs
   :: MonadError Error m
@@ -1002,18 +1061,6 @@ checkRewriteEqns
 checkRewriteEqns
   = checkFold checkRewriteEqn
 
-checkIrrefutableLet
-  :: MonadError Error m
-  => MonadReader Environment m
-  => MonadState State m
-  => MonadIO m
-  => AccessContext
-  -> LHS
-  -> RHS
-  -> m AccessContext
-checkIrrefutableLet c l r
-  = checkRHS c r >> checkLHS c l
-
 checkIrrefutableWith
   :: MonadError Error m
   => MonadReader Environment m
@@ -1145,6 +1192,28 @@ checkDeclarationsRecord
 checkDeclarationsRecord n rs
   = checkDeclarationsWith (checkNiceDeclarationsRecord n rs)
 
+checkDeclarationsLet
+  :: MonadError Error m
+  => MonadReader Environment m
+  => MonadState State m
+  => MonadIO m
+  => AccessContext
+  -> [Declaration]
+  -> m AccessContext
+checkDeclarationsLet
+  = checkDeclarationsWith checkNiceDeclarationsLet
+
+checkDeclarationsLet1
+  :: MonadError Error m
+  => MonadReader Environment m
+  => MonadState State m
+  => MonadIO m
+  => AccessContext
+  -> NonEmpty Declaration
+  -> m AccessContext
+checkDeclarationsLet1 c ds
+  = checkDeclarationsLet c (NonEmpty.toList ds)
+
 checkDeclarationsTop
   :: MonadError Error m
   => MonadReader Environment m
@@ -1231,6 +1300,8 @@ checkNiceDeclaration' fs c (NiceRecSig _ a _ _ _ n bs e)
   = checkNiceSig fs c a RangeRecord n bs e
 checkNiceDeclaration' fs c (NiceDataSig _ a _ _ _ n bs e)
   = checkNiceSig fs c a RangeData n bs e
+checkNiceDeclaration' _ _ (NiceFunClause r _ _ _ _ _ _)
+  = throwError (ErrorInternal (ErrorUnexpected UnexpectedNiceFunClause r))
 checkNiceDeclaration' fs c (FunSig _ a _ _ _ _ _ _ n e)
   = checkExpr c e >> checkName' False fs (fromAccess a) RangeDefinition n
 checkNiceDeclaration' _ c (FunDef _ _ _ _ _ _ _ cs)
@@ -1303,13 +1374,6 @@ checkNiceDeclaration' _ _ (NiceImport r n (Just a) DoOpen i)
   >>= \c'' -> checkModuleNameMay c' Public (getRange a) (fromAsName a)
   >>= \c''' -> pure (c''' <> fromContext (importDirectiveAccess i) c'')
 
-checkNiceDeclaration' _ c
-  (NiceFunClause _ _ _ _ _ _ (Concrete.FunClause l r _ _))
-  = checkIrrefutableLet c l r
-checkNiceDeclaration' _ _
-  (NiceFunClause r _ _ _ _ _ _)
-  = throwError (ErrorInternal (ErrorUnexpected UnexpectedNiceFunClause r))
-
 checkNiceDeclaration' fs c (NicePatternSyn _ a n ns p)
   = localSkip (checkNames' False Public RangeVariable (unArg <$> ns))
   >>= \c' -> checkPattern (c <> c') p
@@ -1377,6 +1441,31 @@ checkNiceDeclarationRecord n rs fs c (NiceField _ a _ _ _ n' (Arg _ e))
     (\n'' -> pure (accessContextField n'' (fromAccess a) rs (syntax fs n'')))
     (fromName n')
 
+checkNiceDeclarationLet
+  :: MonadError Error m
+  => MonadReader Environment m
+  => MonadState State m
+  => MonadIO m
+  => Fixities
+  -> AccessContext
+  -> NiceDeclaration
+  -> m AccessContext
+checkNiceDeclarationLet fs c
+  (NiceMutual _ _ _ _
+    (FunSig _ _ _ _ _ _ _ _ n e : FunDef _ _ _ _ _ _ _
+      (Clause _ _ (LHS p [] []) r NoWhere [] : []) : []))
+  = checkExpr c e
+  >> checkPatternLet (fromName n) p
+  >>= \c' -> checkRHS (c <> c') r
+  >> checkName' False fs Public RangeDefinition n
+checkNiceDeclarationLet _ c
+  (NiceFunClause _ _ _ _ _ _
+    (Concrete.FunClause l r NoWhere _))
+  = checkRHS c r
+  >> checkLHS c l
+checkNiceDeclarationLet _ _ d
+  = throwError (ErrorInternal (ErrorLet (getRange d)))
+
 checkNiceDeclarations
   :: MonadError Error m
   => MonadReader Environment m
@@ -1403,6 +1492,18 @@ checkNiceDeclarationsRecord
   -> m AccessContext
 checkNiceDeclarationsRecord n rs fs
   = checkFoldUnion (checkNiceDeclarationRecord n rs fs)
+
+checkNiceDeclarationsLet
+  :: MonadError Error m
+  => MonadReader Environment m
+  => MonadState State m
+  => MonadIO m
+  => Fixities
+  -> AccessContext
+  -> [NiceDeclaration]
+  -> m AccessContext
+checkNiceDeclarationsLet fs
+  = checkFoldUnion (checkNiceDeclarationLet fs)
 
 checkNiceDeclarationsTop
   :: MonadError Error m

@@ -26,7 +26,7 @@ module Agda.Unused.Types.Context
   , accessContextLookupModule
   , accessContextLookupDefining
   , accessContextLookupSpecial
-  
+
     -- ** Insert
 
   , contextInsertRangeAll
@@ -278,7 +278,7 @@ accessModuleUnion _ m2
 -- | Like '(<>)', but public items take precedence over private items. This is
 -- important when combining contexts from successive declarations; for example:
 --
--- @ 
+-- @
 -- module M where
 --
 --   postulate
@@ -293,7 +293,7 @@ accessModuleUnion _ m2
 --
 -- x : N.A
 -- x = ?
--- @ 
+-- @
 --
 -- This code type-checks, and the identifier @N.A@ refers to the postulate
 -- declared in the definition of @N@, not the definition opened from @M@.

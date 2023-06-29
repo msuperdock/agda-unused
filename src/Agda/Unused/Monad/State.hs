@@ -65,7 +65,7 @@ import Data.Word
 -- ## Definitions
 
 -- | Cache the results of checking modules. This allows us to:
--- 
+--
 -- - Avoid duplicate computations.
 -- - Handle cyclic module dependencies without nontermination.
 data ModuleState where

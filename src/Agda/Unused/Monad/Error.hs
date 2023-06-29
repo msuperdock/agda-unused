@@ -8,7 +8,7 @@ An error monad for determining unused code.
 module Agda.Unused.Monad.Error
 
   ( -- * Definitions
-    
+
     Error(..)
   , InternalError(..)
   , UnexpectedError(..)
@@ -125,6 +125,11 @@ data InternalError where
 
   -- | Unexpected declaration type for constructor.
   ErrorConstructor
+    :: !Range
+    -> InternalError
+
+  -- | Unexpected declaration type in let statement.
+  ErrorLet
     :: !Range
     -> InternalError
 

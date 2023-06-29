@@ -167,6 +167,9 @@ printInternalError
 printInternalError (ErrorConstructor r)
   = printMessage (printRange r)
   $ "Internal error: Invalid data constructor."
+printInternalError (ErrorLet r)
+  = printMessage (printRange r)
+  $ "Internal error: Invalid let statement."
 printInternalError (ErrorMacro r)
   = printMessage (printRange r)
   $ "Internal error: Invalid module application."

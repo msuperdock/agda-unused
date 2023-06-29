@@ -557,9 +557,23 @@ testResult t
       ~: Definition
     , private (name "z'")
       ~: Variable
+    , private (name "x'''")
+      ~: Variable
+    , private (name "z'''")
+      ~: Variable
+    , private (name "x''''")
+      ~: Variable
     , public (name "f")
       ~: Definition
     , public (name "g")
+      ~: Definition
+    , public (name "h")
+      ~: Definition
+    , public (name "i")
+      ~: Definition
+    , public (name "j")
+      ~: Definition
+    , private (name "l")
       ~: Definition
     ]
 

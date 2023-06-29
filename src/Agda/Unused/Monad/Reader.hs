@@ -6,7 +6,7 @@ A reader monad for determining unused code.
 module Agda.Unused.Monad.Reader
 
   ( -- * Definition
-    
+
     Mode(..)
   , Environment(..)
 

@@ -27,5 +27,5 @@ Initial release.
 - Support irrefutable let-patterns (fixes bug).
 - Support module applications in let-patterns (fixes bug).
 - Handle variable shadowing correctly in let-patterns (fixes bug).
-- Resolve imports correctly within the current project (fixes bug).
+- Resolve imports correctly within a project (fixes bug).
 

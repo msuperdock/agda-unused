@@ -1458,6 +1458,9 @@ checkNiceDeclarationLet fs c
   >> checkPatternLet (fromName n) p
   >>= \c' -> checkRHS (c <> c') r
   >> checkName' False fs Public RangeDefinition n
+checkNiceDeclarationLet fs c
+  d@(NiceModuleMacro _ _ _ _ _ _)
+  = checkNiceDeclaration fs c d
 checkNiceDeclarationLet _ c
   (NiceFunClause _ _ _ _ _ _
     (Concrete.FunClause l r NoWhere _))

@@ -575,6 +575,8 @@ testResult t
       ~: Definition
     , private (name "l")
       ~: Definition
+    , public (name "m")
+      ~: Definition
     ]
 
   Expression DoBlock1 ->

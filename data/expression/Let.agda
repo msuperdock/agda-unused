@@ -59,3 +59,10 @@ j {A = A} x''''
     l z'''' = z''''
   in k x'''' x''''
 
+m
+  : {A : Set}
+  → Id A
+  → A
+m a
+  = let module M = Id a in M.value
+

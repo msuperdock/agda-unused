@@ -422,6 +422,12 @@ data IntegrationTest where
   CrossFile
     :: IntegrationTest
 
+  SuppressImport
+    :: IntegrationTest
+
+  SuppressDefinition
+    :: IntegrationTest
+
   deriving Show
 
 testDir
@@ -525,6 +531,10 @@ testFileName (Declaration InstanceDef)
   = "InstanceDef"
 testFileName (Integration CrossFile)
   = "CrossFile"
+testFileName (Integration SuppressImport)
+  = "SuppressImport"
+testFileName (Integration SuppressDefinition)
+  = "SuppressDefinition"
 
 testResult
   :: Test
@@ -886,6 +896,21 @@ testResult t
       ~: Definition
     ]
 
+  Integration SuppressImport ->
+    [ private (name "A")
+      ~: ImportItem
+    , public (name "g")
+      ~: Definition
+    , public (name "f")
+      ~: Definition
+    ]
+
+  Integration SuppressDefinition ->
+    [ private (name "unused-regex")
+      ~: Definition
+    ]
+
+
 -- ## Main
 
 main
@@ -991,6 +1016,10 @@ testIntegration
   = describe "integration"
   $ it "distinguishes files"
     (testCheck (Integration CrossFile))
+  >> it "checks suppression comments on imports (SuppressImport)"
+    (testCheck (Integration SuppressImport))
+  >> it "checks suppression comments on definitions (SuppressDefinition)"
+    (testCheck (Integration SuppressDefinition))
 
 testExample
   :: Spec

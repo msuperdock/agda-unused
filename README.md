@@ -148,7 +148,33 @@ Additionally, we currently do not support the following Agda features:
 `agda-unused` will produce an error if your code uses these language features.
 
 Instance declarations are always treated as used, since determining which
-instances are selected requires type-checking.
+instances are selected requires type-checking.  Imports that only provide
+instances can be suppressed with `-- agda-unused: instances` (see below).
+
+## Suppression Comments
+
+You can suppress specific reports with inline comments:
+
+- `-- agda-unused: ignore` — suppress all reports on the same line
+- `-- agda-unused: instances` — suppress whole-import reports on the same line
+  (useful for imports that provide instances)
+
+Examples:
+
+```agda
+-- Keep the import: its instances are used implicitly at elaboration,
+-- which agda-unused doesn't do:
+import Data.Nat.Instances  -- agda-unused: instances
+
+-- Keep an example definition. An anonymous definition (`_`)
+-- would not be reported, but here the name informs:
+private
+  iso8601-date : Regex    -- agda-unused: ignore
+  iso8601-date = (digit ^ 4) · char '-' · (digit ^ 2) · char '-' · (digit ^ 2)
+```
+
+The `instances` marker only suppresses the whole-import report. If the import
+has a `using` list with individually unused items, those are still reported.
 
 ## Testing
 

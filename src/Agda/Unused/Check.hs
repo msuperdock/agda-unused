@@ -19,8 +19,10 @@ import Agda.Unused.Monad.Reader
     askSkip, localGlobal, localSkip)
 import Agda.Unused.Monad.State
   (ModuleState(..), State, getHash, getModule, getSources, modifyBlock,
-    modifyCheck, modifyDelete, modifyInsert, modifySources, stateEmpty,
-    stateItems, stateModules)
+    modifyCheck, modifyDelete, modifyInsert, modifySources,
+    modifySuppressions, stateEmpty, stateItems, stateModules)
+import Agda.Unused.Suppress
+  (extractSuppressions)
 import Agda.Unused.Types.Access
   (Access(..), fromAccess)
 import Agda.Unused.Types.Context
@@ -82,7 +84,7 @@ import Agda.Syntax.Concrete.Name
 import qualified Agda.Syntax.Concrete.Name
   as N
 import Agda.Syntax.Parser
-  (moduleParser, parseFile, runPMIO)
+  (moduleParser, parseFile, runPMIO, tokensParser)
 import Agda.Syntax.Position
   (Range, Range'(..), RangeFile(..), getRange)
 import Agda.Syntax.TopLevelModuleName
@@ -2153,6 +2155,12 @@ readModule n p = do
     <- liftIO (runPMIO (parseFile moduleParser rangeFile contents))
   ((module', _), _)
     <- liftEither (mapLeft ErrorParse parseResult)
+  (lexResult, _)
+    <- liftIO (runPMIO (parseFile tokensParser rangeFile contents))
+  _
+    <- modifySuppressions $ case lexResult of
+        Right ((tokens, _), _) -> extractSuppressions (filePath (mkAbsolute p)) tokens
+        Left _                 -> mempty
   pure module'
 
 topLevelModuleName

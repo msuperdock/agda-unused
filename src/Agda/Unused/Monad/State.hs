@@ -29,11 +29,14 @@ module Agda.Unused.Monad.State
   , modifyBlock
   , modifyCheck
   , modifySources
+  , modifySuppressions
 
   ) where
 
 import Agda.Unused.Monad.Reader
   (Environment, askSkip)
+import Agda.Unused.Suppress
+  (SuppressionMap, isSuppressed)
 import Agda.Unused.Types.Context
   (Context)
 import Agda.Unused.Types.Name
@@ -100,6 +103,9 @@ data State
   , stateHash
     :: !Word64
     -- ^ An integer to use as the next module hash.
+  , stateSuppressions'
+    :: !SuppressionMap
+    -- ^ Suppression markers extracted from parsed files.
   }
 
 -- ## Interface
@@ -112,6 +118,7 @@ stateEmpty primLibDir
   = State mempty mempty
       (ModuleToSource (FileDictWithBuiltins (empty :: FileDictBuilder) empty primLibDir) Map.empty)
       0
+      mempty
 
 -- | Get a sorted list of state items.
 --
@@ -150,8 +157,8 @@ stateSources
   :: ModuleToSource
   -> State
   -> State
-stateSources ss (State rs ms _ h)
-  = State rs ms ss h
+stateSources ss (State rs ms _ h sm)
+  = State rs ms ss h sm
 
 stateInsert
   :: Range
@@ -160,43 +167,43 @@ stateInsert
   -> State
 stateInsert NoRange _ s
   = s
-stateInsert r@(Range _ _) i (State rs ms ss h)
-  = State (Map.insert r i rs) ms ss h
+stateInsert r@(Range _ _) i (State rs ms ss h sm)
+  = State (Map.insert r i rs) ms ss h sm
 
 stateDelete
   :: Set Range
   -> State
   -> State
-stateDelete rs (State rs' ms ss h)
-  = State (Map.withoutKeys rs' rs) ms ss h
+stateDelete rs (State rs' ms ss h sm)
+  = State (Map.withoutKeys rs' rs) ms ss h sm
 
 stateModule
   :: QName
   -> State
   -> Maybe ModuleState
-stateModule n (State _ ms _ _)
+stateModule n (State _ ms _ _ _)
   = Map.lookup n ms
 
 stateBlock
   :: QName
   -> State
   -> State
-stateBlock n (State rs ms ss h)
-  = State rs (Map.insert n Blocked ms) ss h
+stateBlock n (State rs ms ss h sm)
+  = State rs (Map.insert n Blocked ms) ss h sm
 
 stateCheck
   :: QName
   -> Context
   -> State
   -> State
-stateCheck n c (State rs ms ss h)
-  = State rs (Map.insert n (Checked c) ms) ss h
+stateCheck n c (State rs ms ss h sm)
+  = State rs (Map.insert n (Checked c) ms) ss h sm
 
 stateIncrementHash
   :: State
   -> State
-stateIncrementHash (State rs ms ss h)
-  = State rs ms ss (succ h)
+stateIncrementHash (State rs ms ss h sm)
+  = State rs ms ss (succ h) sm
 
 -- ## Get
 
@@ -235,8 +242,11 @@ modifyInsert
   => Range
   -> RangeInfo
   -> m ()
-modifyInsert r i
-  = askSkip >>= flip unless (modify (stateInsert r i))
+modifyInsert r i = do
+  skip <- askSkip
+  sm <- gets stateSuppressions'
+  unless (skip || isSuppressed sm r i) $
+    modify (stateInsert r i)
 
 -- | Mark a list of items as used.
 modifyDelete
@@ -271,4 +281,12 @@ modifySources
   -> m ()
 modifySources ss
   = modify (stateSources ss)
+
+-- | Record suppression markers extracted from a parsed file.
+modifySuppressions
+  :: MonadState State m
+  => SuppressionMap
+  -> m ()
+modifySuppressions sm
+  = modify (\s -> s {stateSuppressions' = Map.union sm (stateSuppressions' s)})
 

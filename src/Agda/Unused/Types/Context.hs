@@ -239,10 +239,20 @@ instance Semigroup Context where
   Context is1 ms1 <> Context is2 ms2
     = Context (is2 <> is1) (ms2 <> ms1)
 
--- | Prefer values from second access context.
+-- | Prefer values from second access context. Modules with the same name are
+-- merged rather than shadowed, since Agda keeps both in scope; for example,
+-- after @open import M as D using (D)@, both @D.D@ and @D.x@ are valid.
 instance Semigroup AccessContext where
   AccessContext is1 ms1 js1 <> AccessContext is2 ms2 js2
-    = AccessContext (Map.unionWith (<>) is1 is2) (ms2 <> ms1) (js2 <> js1)
+    = AccessContext (Map.unionWith (<>) is1 is2)
+      (Map.unionWith accessModuleMerge ms1 ms2) (js2 <> js1)
+
+accessModuleMerge
+  :: AccessModule
+  -> AccessModule
+  -> AccessModule
+accessModuleMerge (AccessModule _ rs1 c1) (AccessModule a2 rs2 c2)
+  = AccessModule a2 (rs1 <> rs2) (c1 <> c2)
 
 instance Monoid Context where
   mempty

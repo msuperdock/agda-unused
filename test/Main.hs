@@ -422,6 +422,9 @@ data IntegrationTest where
   CrossFile
     :: IntegrationTest
 
+  ModuleAlias
+    :: IntegrationTest
+
   deriving Show
 
 testDir
@@ -525,6 +528,8 @@ testFileName (Declaration InstanceDef)
   = "InstanceDef"
 testFileName (Integration CrossFile)
   = "CrossFile"
+testFileName (Integration ModuleAlias)
+  = "ModuleAlias"
 
 testResult
   :: Test
@@ -886,6 +891,15 @@ testResult t
       ~: Definition
     ]
 
+  Integration ModuleAlias ->
+    [ private (name "d")
+      ~: OpenItem
+    , public (name "f")
+      ~: Definition
+    , public (name "g")
+      ~: Definition
+    ]
+
 -- ## Main
 
 main
@@ -991,6 +1005,8 @@ testIntegration
   = describe "integration"
   $ it "distinguishes files"
     (testCheck (Integration CrossFile))
+  >> it "keeps module aliases that collide with opened modules"
+    (testCheck (Integration ModuleAlias))
 
 testExample
   :: Spec

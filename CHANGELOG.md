@@ -28,4 +28,5 @@ Initial release.
 - Support module applications in let-patterns (fixes bug).
 - Handle variable shadowing correctly in let-patterns (fixes bug).
 - Resolve imports correctly within a project (fixes bug).
+- Keep module aliases that collide with opened modules (fixes bug).
 

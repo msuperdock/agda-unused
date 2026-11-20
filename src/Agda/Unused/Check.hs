@@ -1403,10 +1403,12 @@ checkNiceDeclaration' fs c d@(NiceMutual _ _ _ _ ds)
 
 checkNiceDeclaration' _ c (NiceOpen r n i)
   = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromQName n)
-  >>= \n' -> liftLookup r n' (accessContextLookupModule n' c)
-  >>= \(C.Module rs c') -> modifyDelete rs
-  >> checkImportDirective Open r n' c' i
-  >>= \c'' -> pure (fromContext (importDirectiveAccess i) c'')
+  >>= \n' -> case accessContextLookupModule n' c of
+    Right (C.Module rs c') ->
+      modifyDelete rs
+      >> checkImportDirective Open r n' c' i
+      >>= \c'' -> pure (fromContext (importDirectiveAccess i) c'')
+    Left _ -> checkNonModuleOpen n' c
 
 checkNiceDeclaration' _ _ (NiceImport r n Nothing DontOpen i)
   = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromQName n)
@@ -1747,6 +1749,23 @@ checkNiceModuleMacro c a _ a' (SectionApp r bs n es) o i
 checkNiceModuleMacro c a _ a' (RecordModuleInstance r n) o i
   = checkModuleApp c a r a' n o i
 
+-- | Agda allows @open@ to target a record type or a record value, for
+-- example @open Definition.Definition public@ or @open Cone.Apex apex@.
+-- Such a target is not a module, so there is no module context to open;
+-- the definition itself is used. Our own name maps need not contain it,
+-- because the Agda scope checker has already resolved the name.
+checkNonModuleOpen
+  :: MonadReader Environment m
+  => MonadState State m
+  => QName
+  -> AccessContext
+  -> m AccessContext
+checkNonModuleOpen n c
+  = (case accessContextLookupDefining n c of
+       Right (_, rs) -> modifyDelete rs
+       Left _ -> pure ())
+  >> pure mempty
+
 -- | Look up a module by name, mark it used, check the import directive,
 -- optionally register the module name, and optionally open it.
 checkModuleApp
@@ -1764,17 +1783,19 @@ checkModuleApp
   -> m AccessContext
 checkModuleApp c a r a' n o i
   = liftMaybe (ErrorInternal (ErrorName (getRange n))) (fromQName n)
-  >>= \n' -> liftLookup r n' (accessContextLookupModule n' c)
-  >>= \(C.Module rs c') -> modifyDelete rs
-  >> case a' of
-    N.NoName _ _ -> checkImportDirective Open r n' c' i
-      >>= pure . fromContext (importDirectiveAccess i)
-    _ -> liftMaybe (ErrorInternal (ErrorName (getRange a'))) (fromName a')
-      >>= \a'' -> checkImportDirective Module r (QName a'') c' i
-      >>= \c''' -> checkModuleName c''' a r a''
-      >>= \c'''' -> case o of
-        DontOpen -> pure c''''
-        DoOpen -> pure (c'''' <> fromContext (importDirectiveAccess i) c''')
+  >>= \n' -> case accessContextLookupModule n' c of
+    Right (C.Module rs c') ->
+      modifyDelete rs
+      >> case a' of
+        N.NoName _ _ -> checkImportDirective Open r n' c' i
+          >>= pure . fromContext (importDirectiveAccess i)
+        _ -> liftMaybe (ErrorInternal (ErrorName (getRange a'))) (fromName a')
+          >>= \a'' -> checkImportDirective Module r (QName a'') c' i
+          >>= \c''' -> checkModuleName c''' a r a''
+          >>= \c'''' -> case o of
+            DontOpen -> pure c''''
+            DoOpen -> pure (c'''' <> fromContext (importDirectiveAccess i) c''')
+    Left _ -> checkNonModuleOpen n' c
 
 -- ## Imports
 

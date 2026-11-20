@@ -1,3 +1,4 @@
-dist-newstyle
-result
-
+/.direnv/
+/.envrc.local
+/dist-newstyle/
+/result

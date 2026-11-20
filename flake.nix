@@ -1,24 +1,36 @@
 {
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  inputs = {
+    nixpkgs = {
+      url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    };
+  };
 
   outputs = { self, nixpkgs }:
 
   let
 
-    packages = nixpkgs.legacyPackages.x86_64-linux;
-    derivation = packages.haskellPackages.callCabal2nix "agda-unused" self {};
+    system = "x86_64-linux";
+    pkgs = nixpkgs.legacyPackages.${system};
+
+    agda-unused = pkgs.haskellPackages.callCabal2nix "agda-unused" self { };
+
+    packages = agda-unused.env.nativeBuildInputs ++ [
+      pkgs.cabal-install
+      pkgs.haskellPackages.Agda
+    ];
 
   in
 
   {
-    defaultPackage.x86_64-linux = derivation;
+    packages.${system}.default = agda-unused;
 
-    devShell.x86_64-linux = derivation.env.overrideAttrs (oldAttrs: {
-      buildInputs = oldAttrs.buildInputs ++ [
-        packages.cabal-install
-        packages.haskellPackages.Agda
-      ];
-    });
+    devShells.${system}.default = pkgs.mkShell {
+      inherit packages;
+    };
+
+    # jail.nix permissions; see https://git.sr.ht/~alexdavid/jail.nix
+    jail = combinators: [
+      (combinators.add-pkg-deps packages)
+    ];
   };
 }
-
